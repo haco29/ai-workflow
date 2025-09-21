@@ -1,0 +1,1261 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Development Workflow with Cursor & AI</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue',
+          sans-serif;
+        background: #000000;
+        color: #ffffff;
+        line-height: 1.6;
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 60px 40px;
+      }
+
+      .header {
+        text-align: center;
+        margin-bottom: 80px;
+      }
+
+      .title {
+        font-size: clamp(3.5rem, 6vw, 5.5rem);
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        margin-bottom: 24px;
+        background: linear-gradient(135deg, #ffffff 0%, #a0a0a0 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        line-height: 1.1;
+      }
+
+      .subtitle {
+        font-size: 1.75rem;
+        font-weight: 500;
+        color: #a0a0a0;
+        max-width: 700px;
+        margin: 0 auto 50px auto;
+        line-height: 1.4;
+      }
+
+      /* Workflow Visualization */
+      .workflow-visual {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 40px 0;
+      }
+
+      .workflow-line {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        position: relative;
+        margin-bottom: 20px;
+      }
+
+      .workflow-line::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(
+          90deg,
+          rgba(0, 122, 255, 0.6) 0%,
+          rgba(88, 86, 214, 0.4) 50%,
+          rgba(175, 82, 222, 0.3) 100%
+        );
+        border-radius: 2px;
+        box-shadow: 0 0 10px rgba(0, 122, 255, 0.3);
+        z-index: 1;
+      }
+
+      .workflow-dot {
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.6);
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        position: relative;
+        z-index: 2;
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        cursor: pointer;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      }
+
+      .workflow-dot.active {
+        background: linear-gradient(135deg, #007aff, #5856d6);
+        border-color: #007aff;
+        box-shadow:
+          0 0 30px rgba(0, 122, 255, 0.8),
+          0 0 60px rgba(0, 122, 255, 0.4);
+        transform: scale(1.15);
+      }
+
+      .workflow-dot:hover {
+        border-color: #007aff;
+        transform: scale(1.05);
+      }
+
+      .workflow-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 1rem;
+        color: #a0a0a0;
+        font-weight: 500;
+      }
+
+      .workflow-labels span {
+        width: 70px;
+        text-align: center;
+        font-weight: 600;
+        color: #b0b0b0;
+      }
+
+      .workflow-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+        gap: 32px;
+        margin-top: 60px;
+        max-width: 1400px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      .workflow-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        padding: 32px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        backdrop-filter: blur(20px);
+        position: relative;
+        overflow: hidden;
+        min-height: 220px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+
+      .workflow-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, #007aff, #5856d6, #af52de);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+
+      .workflow-card:hover {
+        background: rgba(255, 255, 255, 0.06);
+        border-color: rgba(255, 255, 255, 0.2);
+        transform: translateY(-4px);
+      }
+
+      .workflow-card:hover::before {
+        opacity: 1;
+      }
+
+      .step-number {
+        font-size: 1.125rem;
+        font-weight: 700;
+        color: #007aff;
+        margin-bottom: 16px;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+      }
+
+      .step-title {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #ffffff;
+        margin-bottom: 16px;
+        letter-spacing: -0.01em;
+        line-height: 1.3;
+      }
+
+      .step-desc {
+        font-size: 1.25rem;
+        color: #b0b0b0;
+        font-weight: 400;
+        line-height: 1.6;
+        margin-bottom: 28px;
+        flex-grow: 1;
+      }
+
+      .step-icon {
+        font-size: 2rem;
+        margin-right: 12px;
+        vertical-align: middle;
+      }
+
+      .expand-button {
+        background: none;
+        border: none;
+        color: #007aff;
+        font-size: 1.125rem;
+        font-weight: 600;
+        cursor: pointer;
+        margin-top: 16px;
+        padding: 8px 0;
+        transition: color 0.2s ease;
+      }
+
+      .expand-button:hover {
+        color: #5856d6;
+      }
+
+      .expand-button:focus {
+        outline: 2px solid #007aff;
+        outline-offset: 2px;
+        border-radius: 4px;
+      }
+
+      /* Rules Section */
+      .rules-section {
+        margin-top: 0;
+        padding: 120px 0 80px 0;
+        background: rgba(175, 82, 222, 0.03);
+        border-top: 3px solid rgba(175, 82, 222, 0.2);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      .rules-title {
+        text-align: center;
+        font-size: 3.25rem;
+        font-weight: 800;
+        color: #ffffff;
+        margin-bottom: 20px;
+        background: linear-gradient(135deg, #ffffff 0%, #a0a0a0 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        line-height: 1.2;
+      }
+
+      .rules-subtitle {
+        text-align: center;
+        font-size: 1.5rem;
+        color: #a0a0a0;
+        margin-bottom: 70px;
+        line-height: 1.4;
+      }
+
+      .rules-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 24px;
+        max-width: 1000px;
+        margin: 0 auto;
+      }
+
+      .rule-card {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        padding: 24px;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .rule-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, #af52de, #ff2d92);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+
+      .rule-card:hover {
+        background: rgba(255, 255, 255, 0.04);
+        border-color: rgba(255, 255, 255, 0.15);
+        transform: translateY(-3px);
+      }
+
+      .rule-card:hover::before {
+        opacity: 1;
+      }
+
+      .rule-name {
+        font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+        font-size: 1.375rem;
+        font-weight: 700;
+        color: #af52de;
+        margin-bottom: 16px;
+      }
+
+      .rule-desc {
+        font-size: 1.125rem;
+        color: #b0b0b0;
+        line-height: 1.6;
+      }
+
+      /* Repository Stats Section */
+      .repo-stats-section {
+        margin-top: 0;
+        padding: 120px 0 120px 0;
+        background: rgba(0, 122, 255, 0.02);
+        border-top: 3px solid rgba(0, 122, 255, 0.15);
+      }
+
+      .repo-title {
+        text-align: center;
+        font-size: 3.25rem;
+        font-weight: 800;
+        color: #ffffff;
+        margin-bottom: 20px;
+        background: linear-gradient(135deg, #ffffff 0%, #a0a0a0 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        line-height: 1.2;
+      }
+
+      .repo-subtitle {
+        text-align: center;
+        font-size: 1.5rem;
+        color: #a0a0a0;
+        margin-bottom: 70px;
+        line-height: 1.4;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 32px;
+        max-width: 900px;
+        margin: 0 auto;
+      }
+
+      .stat-item {
+        text-align: center;
+        padding: 24px 16px;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        transition: all 0.3s ease;
+      }
+
+      .stat-item:hover {
+        background: rgba(255, 255, 255, 0.03);
+        border-color: rgba(255, 255, 255, 0.12);
+        transform: translateY(-3px);
+      }
+
+      .stat-number {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: #007aff;
+        margin-bottom: 12px;
+        line-height: 1;
+      }
+
+      .stat-label {
+        font-size: 1.125rem;
+        color: #b0b0b0;
+        font-weight: 600;
+      }
+
+      /* Commands Section */
+      .commands-section {
+        margin-top: 0;
+        padding: 120px 0 80px 0;
+        background: rgba(0, 0, 0, 0.2);
+        border-top: 3px solid rgba(0, 122, 255, 0.2);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      .commands-title {
+        text-align: center;
+        font-size: 3.25rem;
+        font-weight: 800;
+        color: #ffffff;
+        margin-bottom: 20px;
+        background: linear-gradient(135deg, #ffffff 0%, #a0a0a0 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        line-height: 1.2;
+      }
+
+      .commands-subtitle {
+        text-align: center;
+        font-size: 1.5rem;
+        color: #a0a0a0;
+        margin-bottom: 70px;
+        line-height: 1.4;
+      }
+
+      .commands-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 24px;
+        max-width: 1000px;
+        margin: 0 auto;
+      }
+
+      .command-card {
+        background: rgba(0, 0, 0, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        padding: 24px;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .command-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, #5856d6, #af52de);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+
+      .command-card:hover {
+        background: rgba(0, 0, 0, 0.5);
+        border-color: rgba(255, 255, 255, 0.15);
+        transform: translateY(-3px);
+      }
+
+      .command-card:hover::before {
+        opacity: 1;
+      }
+
+      .command-name {
+        font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+        font-size: 1.375rem;
+        font-weight: 700;
+        color: #5856d6;
+        margin-bottom: 16px;
+      }
+
+      .command-desc {
+        font-size: 1.125rem;
+        color: #b0b0b0;
+        line-height: 1.6;
+      }
+
+      /* Modal styles */
+      .workflow-example {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.95);
+        backdrop-filter: blur(20px);
+        z-index: 1000;
+        padding: 60px;
+        overflow-y: auto;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s ease-out;
+      }
+
+      .workflow-example.expanded {
+        opacity: 1;
+        visibility: visible;
+      }
+
+      .workflow-example.collapsed {
+        opacity: 0;
+        visibility: hidden;
+      }
+
+      .example-content {
+        max-width: 1000px;
+        margin: 0 auto;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 16px;
+        padding: 40px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .example-title {
+        color: #007aff;
+        font-weight: 800;
+        font-size: 2.25rem;
+        margin-bottom: 32px;
+        text-align: center;
+        line-height: 1.2;
+      }
+
+      .example-description {
+        font-size: 1.375rem;
+        line-height: 1.7;
+        color: #ffffff;
+        margin-bottom: 32px;
+      }
+
+      .example-code {
+        background: rgba(0, 0, 0, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 32px;
+        border-radius: 12px;
+        font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+        font-size: 1.125rem;
+        line-height: 1.6;
+        color: #e0e0e0;
+        margin: 32px 0;
+        overflow-x: auto;
+        white-space: pre-line;
+      }
+
+      .close-example {
+        position: absolute;
+        top: 30px;
+        right: 30px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: #ffffff;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 1.25rem;
+        transition: all 0.2s ease;
+      }
+
+      .close-example:hover {
+        background: rgba(255, 255, 255, 0.2);
+        transform: scale(1.1);
+      }
+
+      @media (max-width: 768px) {
+        .container {
+          padding: 40px 20px;
+        }
+
+        .workflow-grid {
+          grid-template-columns: 1fr;
+          gap: 24px;
+          max-width: 100%;
+        }
+
+        .workflow-card {
+          padding: 24px;
+          min-height: auto;
+        }
+
+        .commands-section,
+        .rules-section,
+        .repo-stats-section {
+          margin-top: 60px;
+          padding-top: 40px;
+        }
+
+        .workflow-example {
+          padding: 20px;
+        }
+
+        .example-content {
+          padding: 24px;
+          margin: 0;
+          border-radius: 0;
+        }
+
+        .example-title {
+          font-size: 1.5rem;
+        }
+
+        .example-description {
+          font-size: 1rem;
+        }
+
+        .example-code {
+          font-size: 0.875rem;
+          padding: 16px;
+        }
+      }
+
+      /* Animation */
+      .workflow-card {
+        animation: fadeInUp 0.6s ease-out backwards;
+      }
+
+      .workflow-card:nth-child(1) {
+        animation-delay: 0.1s;
+      }
+      .workflow-card:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .workflow-card:nth-child(3) {
+        animation-delay: 0.3s;
+      }
+      .workflow-card:nth-child(4) {
+        animation-delay: 0.4s;
+      }
+      .workflow-card:nth-child(5) {
+        animation-delay: 0.5s;
+      }
+      .workflow-card:nth-child(6) {
+        animation-delay: 0.6s;
+      }
+      .workflow-card:nth-child(7) {
+        animation-delay: 0.7s;
+      }
+
+      @keyframes fadeInUp {
+        from {
+          opacity: 0;
+          transform: translateY(30px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+    </style>
+    <script>
+      function openExampleById(exampleId) {
+        // Close any other open examples
+        document
+          .querySelectorAll('.workflow-example.expanded')
+          .forEach((ex) => {
+            closeExampleById(ex.id)
+          })
+
+        const example = document.getElementById(exampleId)
+        if (example) {
+          example.classList.remove('collapsed')
+          example.classList.add('expanded')
+          document.body.style.overflow = 'hidden'
+
+          // Focus trap for accessibility
+          example.focus()
+        }
+      }
+
+      function closeExampleById(exampleId) {
+        const example = document.getElementById(exampleId)
+        if (example) {
+          example.classList.remove('expanded')
+          example.classList.add('collapsed')
+          document.body.style.overflow = 'auto'
+        }
+      }
+
+      // Close modal on Escape key
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+          const openExample = document.querySelector(
+            '.workflow-example.expanded'
+          )
+          if (openExample) {
+            closeExampleById(openExample.id)
+          }
+        }
+      })
+
+      // Close modal when clicking outside content
+      document.addEventListener('click', function (e) {
+        if (
+          e.target.classList.contains('workflow-example') &&
+          e.target.classList.contains('expanded')
+        ) {
+          closeExampleById(e.target.id)
+        }
+      })
+
+      // Interactive workflow navigation
+      function highlightWorkflowStep(stepNumber) {
+        // Remove active class from all dots
+        document.querySelectorAll('.workflow-dot').forEach((dot) => {
+          dot.classList.remove('active')
+        })
+
+        // Add active class to current step
+        const currentDot = document.querySelector(`[data-step="${stepNumber}"]`)
+        if (currentDot) {
+          currentDot.classList.add('active')
+        }
+      }
+
+      // Add click handlers to workflow dots
+      document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.workflow-dot').forEach((dot) => {
+          dot.addEventListener('click', function () {
+            const stepNumber = this.getAttribute('data-step')
+            highlightWorkflowStep(stepNumber)
+            openExampleById(`example-${stepNumber}`)
+          })
+        })
+      })
+    </script>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1 class="title">My Development Workflow with Cursor & AI</h1>
+        <p class="subtitle">
+          How I <strong>systematically</strong> build features from idea to
+          production
+        </p>
+
+        <!-- Interactive Workflow Visualization -->
+        <div class="workflow-visual">
+          <div class="workflow-line">
+            <div class="workflow-dot active" data-step="1">🎯</div>
+            <div class="workflow-dot" data-step="2">📋</div>
+            <div class="workflow-dot" data-step="3">⚡</div>
+            <div class="workflow-dot" data-step="4">🔍</div>
+            <div class="workflow-dot" data-step="5">🧪</div>
+            <div class="workflow-dot" data-step="6">✅</div>
+            <div class="workflow-dot" data-step="7">🚀</div>
+          </div>
+          <div class="workflow-labels">
+            <span>Context</span>
+            <span>Progress</span>
+            <span>Implement</span>
+            <span>Reflect</span>
+            <span>Test</span>
+            <span>Quality</span>
+            <span>Deploy</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="workflow-grid">
+        <div class="workflow-card">
+          <div class="step-number">Step 01</div>
+          <h3 class="step-title">
+            <span class="step-icon">🎯</span>Context & Planning
+          </h3>
+          <p class="step-desc">
+            Ask Cursor to read context of what I'm going to build, including
+            @react-development.mdc for standards, then create a detailed plan
+            with small deliverable steps
+          </p>
+          <button class="expand-button" onclick="openExampleById('example-1')">
+            Show my actual workflow →
+          </button>
+        </div>
+
+        <div class="workflow-card">
+          <div class="step-number">Step 02</div>
+          <h3 class="step-title">
+            <span class="step-icon">📋</span>Generate Progress Doc
+          </h3>
+          <p class="step-desc">
+            Run @progress-md.md command to create a consistent progress tracking
+            document with all steps
+          </p>
+          <button class="expand-button" onclick="openExampleById('example-2')">
+            Show my actual workflow →
+          </button>
+        </div>
+
+        <div class="workflow-card">
+          <div class="step-number">Step 03</div>
+          <h3 class="step-title">
+            <span class="step-icon">⚡</span>Implement Features
+          </h3>
+          <p class="step-desc">
+            Work through each step in the progress document, implementing small
+            deliverable chunks. Use @start-playwrite.md to give AI browser
+            context for testing
+          </p>
+          <button class="expand-button" onclick="openExampleById('example-3')">
+            Show my actual workflow →
+          </button>
+        </div>
+
+        <div class="workflow-card">
+          <div class="step-number">Step 04</div>
+          <h3 class="step-title">
+            <span class="step-icon">🔍</span>Reflect on Changes
+          </h3>
+          <p class="step-desc">
+            Run @reflect-changes.md to analyze what was implemented and ensure
+            React patterns compliance
+          </p>
+          <button class="expand-button" onclick="openExampleById('example-4')">
+            Show my actual workflow →
+          </button>
+        </div>
+
+        <div class="workflow-card">
+          <div class="step-number">Step 05</div>
+          <h3 class="step-title"><span class="step-icon">🧪</span>Add Tests</h3>
+          <p class="step-desc">
+            Run @add-tests.md to generate user-centric tests following my
+            testing patterns and best practices
+          </p>
+          <button class="expand-button" onclick="openExampleById('example-5')">
+            Show my actual workflow →
+          </button>
+        </div>
+
+        <div class="workflow-card">
+          <div class="step-number">Step 06</div>
+          <h3 class="step-title">
+            <span class="step-icon">✅</span>Quality Assurance
+          </h3>
+          <p class="step-desc">
+            Run @precommit.md for deterministic quality checks: TypeScript,
+            linting, formatting, and tests
+          </p>
+          <button class="expand-button" onclick="openExampleById('example-6')">
+            Show my actual workflow →
+          </button>
+        </div>
+
+        <div class="workflow-card">
+          <div class="step-number">Step 07</div>
+          <h3 class="step-title">
+            <span class="step-icon">🚀</span>Commit & Continue
+          </h3>
+          <p class="step-desc">
+            Commit with generated message and move to next step in progress doc
+          </p>
+          <button class="expand-button" onclick="openExampleById('example-7')">
+            Show my actual workflow →
+          </button>
+        </div>
+      </div>
+
+      <!-- Command Showcase -->
+      <div class="container">
+        <div class="commands-section">
+          <h2 class="commands-title">My Cursor Commands</h2>
+          <p class="commands-subtitle">
+            The automation that powers this workflow
+          </p>
+          <div class="commands-grid">
+            <div class="command-card">
+              <div class="command-name">@progress-md.md</div>
+              <div class="command-desc">
+                Creates structured progress tracking documents with testable
+                steps
+              </div>
+            </div>
+            <div class="command-card">
+              <div class="command-name">@reflect-changes.md</div>
+              <div class="command-desc">
+                Analyzes implementations for React pattern compliance and
+                quality
+              </div>
+            </div>
+            <div class="command-card">
+              <div class="command-name">@add-tests.md</div>
+              <div class="command-desc">
+                Generates user-centric tests with accessibility-focused queries
+              </div>
+            </div>
+            <div class="command-card">
+              <div class="command-name">@precommit.md</div>
+              <div class="command-desc">
+                Runs comprehensive quality checks and generates commit messages
+              </div>
+            </div>
+            <div class="command-card">
+              <div class="command-name">@start-playwrite.md</div>
+              <div class="command-desc">
+                Starts dev server and opens Playwright to give AI browser
+                context for testing
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cursor Rules Section -->
+      <div class="container">
+        <div class="rules-section">
+          <h2 class="rules-title">My Cursor Rules</h2>
+          <p class="rules-subtitle">
+            Project-specific guidelines that shape AI behavior
+          </p>
+          <div class="rules-grid">
+            <div class="rule-card">
+              <div class="rule-name">react-development.mdc</div>
+              <div class="rule-desc">
+                React patterns, TypeScript conventions, and component
+                architecture standards
+              </div>
+            </div>
+            <div class="rule-card">
+              <div class="rule-name">api-development.mdc</div>
+              <div class="rule-desc">
+                HttpClient usage patterns and API interaction guidelines
+              </div>
+            </div>
+            <div class="rule-card">
+              <div class="rule-name">quality-check.mdc</div>
+              <div class="rule-desc">
+                Comprehensive quality checks and validation procedures
+              </div>
+            </div>
+            <div class="rule-card">
+              <div class="rule-name">product-roadmap.mdc</div>
+              <div class="rule-desc">
+                Product context and feature development guidelines
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Repository Stats Section -->
+      <div class="container">
+        <div class="repo-stats-section">
+          <h2 class="repo-title">visor-web Repository</h2>
+          <p class="repo-subtitle">
+            Real project built with this systematic approach
+          </p>
+          <div class="stats-grid">
+            <div class="stat-item">
+              <div class="stat-number">168</div>
+              <div class="stat-label">Commits</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-number">1 month</div>
+              <div class="stat-label">Development</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-number">22K+</div>
+              <div class="stat-label">Lines of Code</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-number">React + TS</div>
+              <div class="stat-label">Stack</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-number">Legal Tech</div>
+              <div class="stat-label">Domain</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-number">Vitest</div>
+              <div class="stat-label">Testing</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Examples -->
+      <div id="example-1" class="workflow-example collapsed" tabindex="-1">
+        <div class="example-content">
+          <button class="close-example" onclick="closeExampleById('example-1')">
+            ×
+          </button>
+          <div class="example-title">Step 1: Context & Planning</div>
+          <p class="example-description">
+            When I get a new feature request, I start by giving Cursor full
+            context about what I'm building, including my Cursor rules for
+            consistent standards.
+          </p>
+          <pre class="example-code">
+My typical prompt to Cursor:
+
+"I need to build a trackable insights feature for legal case management. 
+
+Please read the context:
+- @src/pages/CaseTrackables.README.md 
+- @src/components/CaseManagement/
+- @docs/trackables-architecture.md
+- @.cursor/rules/react-development.mdc (React/TS patterns & standards)
+- @.cursor/rules/quality-check.mdc (quality requirements)
+- @.cursor/rules/api-development.mdc (API interaction patterns)
+
+Now create a detailed implementation plan with:
+1. Small, deliverable steps
+2. Testing strategy  
+3. Component architecture
+4. Best practices to follow"
+        </pre
+          >
+          <p class="example-description">
+            This gives Cursor complete context about my codebase, architecture
+            patterns, and development standards. The Cursor rules ensure
+            consistent React/TypeScript patterns, accessibility compliance, and
+            quality standards. The AI can then create a plan that fits perfectly
+            with my existing code.
+          </p>
+        </div>
+      </div>
+
+      <div id="example-2" class="workflow-example collapsed" tabindex="-1">
+        <div class="example-content">
+          <button class="close-example" onclick="closeExampleById('example-2')">
+            ×
+          </button>
+          <div class="example-title">Step 2: Generate Progress Document</div>
+          <p class="example-description">
+            After getting the plan, I run my @progress-md.md command to create a
+            structured progress tracking document.
+          </p>
+          <pre class="example-code">
+Command: @progress-md.md
+
+Generated output: progress.md
+
+# 🎯 Trackable Insights Feature - Progress Tracker
+
+## 📋 Project Overview
+**Objective**: Build trackable insights UI with status management
+**Status**: 🔄 In Progress | **Phase**: 1 of 3 | **Progress**: 0%
+
+## ⏳ Pending Steps
+- [ ] **STEP-001**: Create TrackableOverview component
+- [ ] **STEP-002**: Add filtering and search functionality  
+- [ ] **STEP-003**: Implement status override modal
+- [ ] **STEP-004**: Add comprehensive tests
+- [ ] **STEP-005**: Update documentation
+
+Each step is designed to be committed independently.
+        </pre
+          >
+          <p class="example-description">
+            This creates a living document that tracks exactly what needs to be
+            done, with clear success criteria for each step. I can work through
+            it systematically and track progress.
+          </p>
+        </div>
+      </div>
+
+      <div id="example-3" class="workflow-example collapsed" tabindex="-1">
+        <div class="example-content">
+          <button class="close-example" onclick="closeExampleById('example-3')">
+            ×
+          </button>
+          <div class="example-title">Step 3: Implement Features</div>
+          <p class="example-description">
+            I work through each step in the progress document, implementing
+            small deliverable chunks that can be committed independently. I also
+            use Playwright to give AI browser context for testing UI components.
+          </p>
+          <pre class="example-code">
+Working on STEP-001: Create TrackableOverview component
+
+Me: "Based on our plan, implement STEP-001. Follow the patterns in 
+@src/components/ui/ and ensure accessibility compliance."
+
+Cursor creates:
+- TrackableOverview.tsx with proper TypeScript interfaces
+- Follows established component patterns
+- Includes accessibility attributes
+- Uses existing design system components
+
+For testing UI components:
+Me: "@start-playwrite.md then navigate to the component page"
+
+Playwright opens with browser context, allowing AI to:
+- See the actual rendered component
+- Test interactions and responsiveness
+- Validate visual design and layout
+- Debug styling issues in real-time
+
+Result: One focused, testable component that fits the architecture.
+        </pre
+          >
+          <p class="example-description">
+            Each step is small enough to understand, test, and commit. This
+            prevents large, risky changes and makes code review much easier.
+          </p>
+        </div>
+      </div>
+
+      <div id="example-4" class="workflow-example collapsed" tabindex="-1">
+        <div class="example-content">
+          <button class="close-example" onclick="closeExampleById('example-4')">
+            ×
+          </button>
+          <div class="example-title">Step 4: Reflect on Changes</div>
+          <p class="example-description">
+            After implementing features, I run @reflect-changes.md to analyze
+            what was built and ensure compliance with my development patterns.
+          </p>
+          <pre class="example-code">
+Command: @reflect-changes.md
+
+Output:
+📋 Summary of Changes:
+- Added TrackableOverview component with progress visualization
+- Implemented filtering with proper state management
+- Used React Query for server state, useState for local state
+
+🎯 React Development Pattern Compliance:
+✅ Component Structure: PascalCase naming, proper organization
+✅ TypeScript Usage: Proper interfaces and type safety  
+✅ Accessibility: WCAG 2.1 AA compliance, data-testid attributes
+✅ State Management: Correct React Query vs useState usage
+
+🔍 Extraction Opportunities:
+- ProgressRing component could be moved to ui/ folder for reuse
+        </pre
+          >
+          <p class="example-description">
+            This validates that my implementation follows established patterns
+            and identifies opportunities for improvement or component
+            extraction.
+          </p>
+        </div>
+      </div>
+
+      <div id="example-5" class="workflow-example collapsed" tabindex="-1">
+        <div class="example-content">
+          <button class="close-example" onclick="closeExampleById('example-5')">
+            ×
+          </button>
+          <div class="example-title">Step 5: Add Tests</div>
+          <p class="example-description">
+            I run @add-tests.md to generate user-centric tests that follow my
+            established testing patterns and focus on real user interactions.
+          </p>
+          <pre class="example-code">
+Command: @add-tests.md
+
+Generated tests:
+describe('TrackableOverview', () => {
+  it('allows user to see progress visualization', () => {
+    render(&lt;TrackableOverview items={mockItems} /&gt;)
+    
+    // User sees progress ring
+    expect(screen.getByRole('progressbar')).toBeInTheDocument()
+    expect(screen.getByText('75% Complete')).toBeInTheDocument()
+  })
+  
+  it('allows user to filter by completion status', async () => {
+    render(&lt;TrackableOverview items={mockItems} /&gt;)
+    
+    // User selects filter
+    const filter = screen.getByLabelText(/filter by status/i)
+    await user.selectOptions(filter, 'completed')
+    
+    // User sees filtered results
+    expect(screen.getByText('3 completed items')).toBeInTheDocument()
+  })
+})
+        </pre
+          >
+          <p class="example-description">
+            Tests focus on what users actually do - not implementation details.
+            Uses accessibility-focused queries that also validate my component's
+            a11y compliance.
+          </p>
+        </div>
+      </div>
+
+      <div id="example-6" class="workflow-example collapsed" tabindex="-1">
+        <div class="example-content">
+          <button class="close-example" onclick="closeExampleById('example-6')">
+            ×
+          </button>
+          <div class="example-title">Step 6: Quality Assurance</div>
+          <p class="example-description">
+            Before committing, I run @precommit.md to get deterministic quality
+            validation from tools - not opinions.
+          </p>
+          <pre class="example-code">
+Command: @precommit.md
+
+Quality Checks:
+✅ TypeScript compilation - No type errors
+✅ ESLint - Code quality standards met  
+✅ Prettier - Consistent formatting
+✅ Vitest - All 127 tests passing
+✅ React patterns - Development standards compliance
+
+📊 Quality metrics:
+- 0 linting errors
+- 0 type errors  
+- 98% test coverage
+- All accessibility checks passed
+
+🎯 SUGGESTED COMMIT MESSAGE:
+feat: add trackable insights overview with progress visualization
+
+✨ Key improvements:
+- TrackableOverview component with completion metrics
+- Filtering by status and priority
+- Accessible progress indicators with ARIA labels
+- Comprehensive test coverage for user workflows
+        </pre
+          >
+          <p class="example-description">
+            Tools give me objective validation that the code meets standards. No
+            human judgment needed - if tools pass, the code is ready to commit.
+          </p>
+        </div>
+      </div>
+
+      <div id="example-7" class="workflow-example collapsed" tabindex="-1">
+        <div class="example-content">
+          <button class="close-example" onclick="closeExampleById('example-7')">
+            ×
+          </button>
+          <div class="example-title">Step 7: Commit & Continue</div>
+          <p class="example-description">
+            With quality validation complete, I commit the changes and update
+            the progress document for the next step.
+          </p>
+          <pre class="example-code">
+Commit with generated message:
+git commit -m "feat: add trackable insights overview with progress visualization
+
+✨ Key improvements:
+- TrackableOverview component with completion metrics  
+- Filtering by status and priority
+- Accessible progress indicators with ARIA labels
+- Comprehensive test coverage for user workflows"
+
+Update progress.md:
+## ✅ Completed Steps
+- [x] **STEP-001**: Create TrackableOverview component ✅
+  - Commit: feat: add trackable insights overview
+  - Validated: All quality checks passed
+
+## 🔄 In Progress
+- [ ] **STEP-002**: Add filtering and search functionality 🔄
+  - Status: Ready to implement
+  - ETA: Next work session
+        </pre
+          >
+          <p class="example-description">
+            Each step gets a descriptive commit with clear value. The progress
+            document stays updated so I always know exactly what's next and
+            what's been completed.
+          </p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

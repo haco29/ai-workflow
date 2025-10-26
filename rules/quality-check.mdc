@@ -1,0 +1,71 @@
+---
+description: Comprehensive quality checks before committing code
+globs: ['src/**/*', 'package.json', 'vite.config.ts']
+alwaysApply: false
+---
+
+# Quality Assurance Workflow
+
+Before committing or deploying code, always run these quality checks:
+
+## 1. Code Quality
+
+```bash
+mise ci
+```
+
+- TypeScript type checking
+- ESLint code quality
+- Prettier formatting validation
+- Test suite execution
+
+## 2. Build Verification
+
+```bash
+mise run build
+```
+
+- Production build compilation
+- Asset generation verification
+- Bundle size validation
+
+## 3. Security Audit
+
+```bash
+pnpm audit
+```
+
+- Dependency vulnerability scanning
+- Outdated package detection
+
+## 4. Git Status
+
+```bash
+git status --porcelain
+```
+
+- Ensure working directory is clean
+- Check for uncommitted changes
+
+## Common Issues & Solutions
+
+### TypeScript Errors
+
+- Run `mise run type-check` to see detailed errors
+- Fix type issues before committing
+
+### Linting Issues
+
+- Run `mise run lint:fix` to auto-fix issues
+- Review remaining issues manually
+
+### Test Failures
+
+- Run `mise run test:watch` for interactive debugging
+- Ensure all tests pass before committing
+
+### Build Failures
+
+- Check for missing dependencies
+- Verify environment variables are set
+- Review build configuration

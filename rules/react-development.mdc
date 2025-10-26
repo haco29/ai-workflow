@@ -1,0 +1,1446 @@
+---
+description: React and TypeScript development patterns for this project
+globs: ['src/**/*.{ts,tsx}']
+alwaysApply: false
+---
+
+# React & TypeScript Development Patterns
+
+## Component Structure
+
+### File Organization
+
+```
+components/
+  FeatureName/
+    FeatureName.tsx          # Main component
+    FeatureName.spec.tsx     # Tests
+    index.ts                 # Exports
+    types.ts                 # TypeScript interfaces (if needed)
+```
+
+### Component Patterns
+
+```typescript
+// ✅ Good: Named export with interface
+interface UserCardProps {
+  user: User
+  onEdit?: (user: User) => void
+}
+
+export const UserCard = ({ user, onEdit }: UserCardProps) => {
+  return (
+    <div className="user-card">
+      <h3>{user.name}</h3>
+      {onEdit && (
+        <button onClick={() => onEdit(user)}>
+          Edit
+        </button>
+      )}
+    </div>
+  )
+}
+```
+
+### Component Architecture & Separation of Concerns
+
+#### Keep Components Clean and Focused
+
+**❌ Bad: Large component with mixed responsibilities**
+
+```typescript
+const CasesView: React.FC = () => {
+  const [currentPage, setCurrentPage] = useState(1)
+  const [searchTerm, setSearchTerm] = useState('')
+
+  // Business logic mixed with UI
+  const handlePageChange = (page: number) => setCurrentPage(page)
+  const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString()
+
+  // Complex pagination calculations
+  const totalPages = Math.ceil(totalItems / itemsPerPage)
+  const offset = (currentPage - 1) * itemsPerPage
+
+  return (
+    <Box>
+      {/* Mixed UI concerns */}
+      <Input placeholder="Search..." value={searchTerm} onChange={handleSearch} />
+      <VStack>
+        {cases.map(case => (
+          <Card key={case.id}>
+            <Text>{case.name}</Text>
+            <Text>{formatDate(case.createdAt)}</Text>
+          </Card>
+        ))}
+      </VStack>
+      {/* Inline pagination controls */}
+      <HStack>
+        <Button onClick={() => handlePageChange(currentPage - 1)}>Prev</Button>
+        {Array.from({ length: totalPages }, (_, i) => (
+          <Button key={i} onClick={() => handlePageChange(i + 1)}>{i + 1}</Button>
+        ))}
+        <Button onClick={() => handlePageChange(currentPage + 1)}>Next</Button>
+      </HStack>
+    </Box>
+  )
+}
+```
+
+**✅ Good: Separated concerns with hooks and reusable components**
+
+```typescript
+// Custom hook for pagination logic
+const usePagination = (totalItems: number, itemsPerPage: number) => {
+  const [currentPage, setCurrentPage] = useState(1)
+  const totalPages = Math.ceil(totalItems / itemsPerPage)
+  const offset = (currentPage - 1) * itemsPerPage
+
+  return {
+    currentPage,
+    totalPages,
+    offset,
+    goToPage: (page: number) => setCurrentPage(page),
+    goToNextPage: () => setCurrentPage(prev => prev + 1),
+    goToPrevPage: () => setCurrentPage(prev => prev - 1),
+  }
+}
+
+// Reusable pagination component
+const PaginationControls: React.FC<PaginationControlsProps> = ({
+  currentPage,
+  totalPages,
+  onPageChange,
+  onPrevPage,
+  onNextPage,
+}) => {
+  return (
+    <HStack>
+      <Button onClick={onPrevPage}>Previous</Button>
+      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+        const pageNum = Math.max(1, currentPage - 2) + i
+        return (
+          <Button key={pageNum} onClick={() => onPageChange(pageNum)}>
+            {pageNum}
+          </Button>
+        )
+      })}
+      <Button onClick={onNextPage}>Next</Button>
+    </HStack>
+  )
+}
+
+// Clean, focused component
+const CasesView: React.FC = () => {
+  const pagination = usePagination(totalItems, ITEMS_PER_PAGE)
+  const { data: cases } = useCasesQuery({
+    limit: ITEMS_PER_PAGE,
+    offset: pagination.offset,
+  })
+
+  return (
+    <VStack spacing={6}>
+      <VStack spacing={4}>
+        {cases?.map(case => (
+          <GenericCard key={case.id}>
+            <Text>{case.name}</Text>
+            <Text>{formatDate(case.createdAt)}</Text>
+          </GenericCard>
+        ))}
+      </VStack>
+
+      <PaginationControls
+        currentPage={pagination.currentPage}
+        totalPages={pagination.totalPages}
+        onPageChange={pagination.goToPage}
+        onPrevPage={pagination.goToPrevPage}
+        onNextPage={pagination.goToNextPage}
+      />
+    </VStack>
+  )
+}
+```
+
+#### Best Practices for Component Separation
+
+**🎯 Single Responsibility Principle**
+
+- Each component should have one clear purpose
+- Extract complex logic into custom hooks
+- Create reusable UI components for repeated patterns
+
+**🔧 Custom Hooks for Logic**
+
+```typescript
+// ✅ Extract business logic to hooks
+const usePagination = (totalItems: number, itemsPerPage: number) => {
+  // Logic here
+}
+
+const useSearch = (items: Item[]) => {
+  const [searchTerm, setSearchTerm] = useState('')
+  const filteredItems = useMemo(() => {
+    return items.filter((item) =>
+      item.name.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  }, [items, searchTerm])
+
+  return { searchTerm, setSearchTerm, filteredItems }
+}
+```
+
+**🧩 Reusable UI Components**
+
+```typescript
+// ✅ Create reusable components
+const PaginationControls = ({ currentPage, totalPages, onPageChange }) => {
+  // UI logic here
+}
+
+const DataTable = ({ data, columns, onSort }) => {
+  // Table logic here
+}
+
+const SearchInput = ({ value, onChange, placeholder }) => {
+  // Search UI here
+}
+```
+
+**📁 File Organization for Separation**
+
+```
+components/
+  Cases/
+    CasesView.tsx          # Main component (UI orchestration)
+    CasesList.tsx          # Cases display logic
+    CaseCard.tsx           # Individual case component
+    index.ts              # Clean exports
+
+hooks/
+  usePagination.ts       # Pagination logic
+  useSearch.ts          # Search logic
+  useCasesQuery.ts      # Data fetching
+
+ui/
+  PaginationControls.tsx # Reusable pagination
+  SearchInput.tsx       # Reusable search
+  DataTable.tsx         # Reusable table
+```
+
+#### When to Extract Components
+
+**Extract when:**
+
+- Component has > 200 lines
+- Component has multiple responsibilities
+- Logic is reused across components
+- Component has complex state management
+- Component handles multiple data transformations
+
+**Keep together when:**
+
+- Component is small and focused (< 100 lines)
+- Logic is unique to that component
+- Component is a simple wrapper/presenter
+
+## State Management
+
+### React Query for Server State
+
+```typescript
+// ✅ Good: Use React Query for API data
+const useUsersQuery = () => {
+  return useQuery({
+    queryKey: ['users'],
+    queryFn: () => HttpClient.getUsers(),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  })
+}
+```
+
+### Local State
+
+```typescript
+// ✅ Good: useState for local UI state
+const [isEditing, setIsEditing] = useState(false)
+const [formData, setFormData] = useState(initialData)
+```
+
+## TypeScript Best Practices
+
+### Interface Definitions
+
+```typescript
+// ✅ Good: Define interfaces for props and data
+interface ApiResponse<T> {
+  data: T
+  pagination?: Pagination
+  error?: string
+}
+
+interface User {
+  id: string
+  name: string
+  email: string
+  createdAt: string
+}
+```
+
+### Generic Components
+
+```typescript
+// ✅ Good: Generic components with proper constraints
+interface SelectProps<T> {
+  options: T[]
+  value: T | null
+  onChange: (value: T) => void
+  getLabel: (item: T) => string
+}
+
+export const Select = <T extends { id: string }>({
+  options,
+  value,
+  onChange,
+  getLabel,
+}: SelectProps<T>) => {
+  // Implementation
+}
+```
+
+### TypeScript Generics in JSX - Build Tool Compatibility
+
+**Important: Avoid unnecessary generic syntax in JSX to prevent build tool conflicts.**
+
+#### The Problem: Build Tool Conflicts
+
+Some build tools and plugins (like `lovable-tagger`) can conflict with TypeScript generic syntax in JSX:
+
+```typescript
+// ❌ Problematic: Can cause build errors with certain plugins
+<MultiSelect<string>
+  options={options}
+  selectedValues={selected}
+  onChange={onChange}
+/>
+```
+
+#### The Solution: Use Default Generic Types
+
+**Always prefer default generic types over explicit generic syntax when possible:**
+
+```typescript
+// ✅ Good: Component definition with default generic type
+export const MultiSelect = <T extends string | number = string>({
+  options,
+  selectedValues,
+  onChange,
+  // ... other props
+}: MultiSelectProps<T>) => {
+  // Implementation
+}
+
+// ✅ Good: Usage without generic syntax (uses default 'string' type)
+<MultiSelect
+  options={options}
+  selectedValues={selected}
+  onChange={onChange}
+/>
+
+// ❌ Unnecessary: Don't specify generic if it's the default
+<MultiSelect<string>  // 'string' is already the default
+  options={options}
+  selectedValues={selected}
+  onChange={onChange}
+/>
+```
+
+#### When Generic Syntax is Needed
+
+Only use explicit generic syntax when you need a type other than the default:
+
+```typescript
+// ✅ Good: Explicit generic needed for non-default type
+<MultiSelect<number>
+  options={numberOptions}
+  selectedValues={selectedNumbers}
+  onChange={handleNumberChange}
+/>
+
+// ✅ Good: Custom type requires explicit generic
+interface CustomOption {
+  id: string
+  label: string
+}
+
+<MultiSelect<CustomOption>
+  options={customOptions}
+  selectedValues={selectedCustom}
+  onChange={handleCustomChange}
+/>
+```
+
+#### Build Tool Workaround (Last Resort)
+
+If you must use generic syntax and encounter build tool conflicts, use type casting as a workaround:
+
+```typescript
+// ⚠️ Workaround: Only if generic syntax is absolutely necessary
+const TypedMultiSelect = MultiSelect as React.ComponentType<
+  MultiSelectProps<CustomType>
+>
+
+return (
+  <TypedMultiSelect
+    options={options}
+    selectedValues={selected}
+    onChange={onChange}
+  />
+)
+```
+
+#### Key Lessons
+
+1. **Question the necessity**: Always ask "Do I really need explicit generic syntax here?"
+2. **Default types are powerful**: Well-designed default generic types eliminate most explicit usage
+3. **KISS principle**: Simpler code is better code - avoid over-engineering
+4. **Build tool compatibility**: Consider how build tools might interpret your TypeScript syntax
+5. **Type safety preserved**: Default generics still provide full type checking and IntelliSense
+
+## Styling Patterns
+
+### Chakra UI v2 Components
+
+```typescript
+// ✅ Good: Use Chakra UI components with theme
+import { Button, Box, Text, VStack, HStack } from '@chakra-ui/react'
+
+const UserCard = ({ user }: UserCardProps) => {
+  return (
+    <Box borderWidth="1px" borderRadius="lg" p={4} shadow="md">
+      <VStack spacing={3} align="stretch">
+        <Text fontSize="xl" fontWeight="bold">
+          {user.name}
+        </Text>
+        <HStack spacing={2}>
+          <Button colorScheme="blue" size="sm" onClick={handleEdit}>
+            Edit
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleDelete}>
+            Delete
+          </Button>
+        </HStack>
+      </VStack>
+    </Box>
+  )
+}
+```
+
+### Verbit UI Library Components
+
+```typescript
+// ✅ Good: Use Verbit UI components when available
+import { VerbitButton, VerbitCard } from '@verbit-ai/verbit-ui-library'
+
+const DashboardCard = ({ title, children }: DashboardCardProps) => {
+  return (
+    <VerbitCard title={title} variant="elevated">
+      {children}
+    </VerbitCard>
+  )
+}
+```
+
+### Emotion Styled Components (when needed)
+
+```typescript
+// ✅ Good: Use Emotion for custom styled components
+import styled from '@emotion/styled'
+
+const StyledContainer = styled.div`
+  background: ${(props) => props.theme.colors.background};
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+
+  &:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  }
+`
+
+const CustomButton = styled.button`
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  padding: 12px 24px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+  }
+`
+```
+
+### Theme Usage
+
+```typescript
+// ✅ Good: Use Chakra theme values
+import { useTheme } from '@chakra-ui/react'
+
+const ThemedComponent = () => {
+  const theme = useTheme()
+
+  return (
+    <Box
+      bg={theme.colors.brand.primary}
+      color={theme.colors.white}
+      p={theme.space[4]}
+    >
+      Themed content
+    </Box>
+  )
+}
+```
+
+### Responsive Design
+
+```typescript
+// ✅ Good: Chakra UI responsive patterns
+<Box
+  display={{ base: 'block', md: 'flex' }}
+  flexDirection={{ base: 'column', md: 'row' }}
+  gap={{ base: 4, md: 6 }}
+  p={{ base: 4, md: 6, lg: 8 }}
+>
+  <Box flex={{ md: 1 }}>
+    Content
+  </Box>
+  <Box flex={{ md: 1 }}>
+    Sidebar
+  </Box>
+</Box>
+```
+
+## Testing Patterns
+
+### Component Testing with userEvent
+
+**Always use `@testing-library/user-event` instead of `fireEvent` for user interactions.**
+
+**Key advantages:**
+
+- More realistic user behavior simulation
+- Async by default (avoids act() warnings)
+- Better accessibility testing
+- Proper keyboard navigation support
+
+**Basic pattern:**
+
+```typescript
+import userEvent from '@testing-library/user-event'
+
+it('handles user interaction', async () => {
+  const user = userEvent.setup()
+  render(<Component />)
+
+  await user.click(screen.getByRole('button'))
+  await user.type(screen.getByRole('textbox'), 'text')
+})
+```
+
+**Clean error testing:**
+
+```typescript
+// Mock console.error to suppress expected logs
+const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+// ... test error scenarios ...
+consoleSpy.mockRestore()
+```
+
+## Constants and Magic Numbers
+
+### HTTP Status Codes
+
+**Always use constants from the centralized httpStatusCodes file instead of magic numbers.**
+
+```typescript
+// ✅ Good: Use constants
+import {
+  AUTHENTICATION_ERROR_STATUS_CODE,
+  HTTP_STATUS,
+} from '@/constants/httpStatusCodes'
+
+if (error.response?.status === AUTHENTICATION_ERROR_STATUS_CODE) {
+  // Handle 401
+}
+
+if (error.response?.status === HTTP_STATUS.NOT_FOUND) {
+  // Handle 404
+}
+
+// ❌ Bad: Magic numbers
+if (error.response?.status === 401) {
+  // Don't use magic numbers
+}
+```
+
+### Other Constants
+
+**Define constants for any repeated values or configuration.**
+
+```typescript
+// ✅ Good: Constants file
+// constants/pagination.ts
+export const DEFAULT_PAGE_SIZE = 10
+export const MAX_PAGE_SIZE = 100
+
+// constants/validation.ts
+export const MIN_PASSWORD_LENGTH = 8
+export const MAX_FILE_SIZE_MB = 10
+
+// Usage
+import { DEFAULT_PAGE_SIZE } from '@/constants/pagination'
+```
+
+## Error Handling
+
+### React Error Boundaries
+
+```typescript
+// ✅ Good: Use error boundaries for better UX
+class ErrorBoundary extends Component {
+  state = { hasError: false }
+
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('Error caught by boundary:', error, errorInfo)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <div>Something went wrong. Please try again.</div>
+    }
+
+    return this.props.children
+  }
+}
+```
+
+## Performance Considerations
+
+### Memoization
+
+```typescript
+// ✅ Good: Memoize expensive calculations
+const expensiveValue = useMemo(() => {
+  return heavyCalculation(props.data)
+}, [props.data])
+
+// ✅ Good: Memoize callbacks
+const handleClick = useCallback(() => {
+  doSomething(props.id)
+}, [props.id])
+
+// ✅ Good: Memoize components when appropriate
+const MemoizedComponent = memo(({ data }) => {
+  return <div>{data.value}</div>
+})
+```
+
+## File Naming Conventions
+
+### Components: PascalCase
+
+```
+UserCard.tsx
+DataTable.tsx
+ModalDialog.tsx
+```
+
+### Utilities: camelCase
+
+```
+formatDate.ts
+validateEmail.ts
+debounce.ts
+```
+
+### Types: PascalCase with suffix
+
+```
+User.ts
+ApiResponse.ts
+ComponentProps.ts
+```
+
+## E2E Testing Best Practices
+
+### Data Test IDs for E2E Testing
+
+**Always add `data-testid` attributes to key interactive and semantic elements for reliable E2E testing.**
+
+#### When to Add data-testid
+
+**✅ Always add data-testid to:**
+
+- Form inputs and controls
+- Buttons (especially CTAs and submit buttons)
+- Navigation elements and links
+- Modal/dialog containers and triggers
+- List items and cards (with unique identifiers)
+- Loading states and error messages
+- Key data display elements
+- Search inputs and filters
+- Pagination controls
+- Dropdown menus and selects
+- File upload areas
+- Toggle switches and checkboxes
+
+#### Naming Convention
+
+Use kebab-case with semantic, hierarchical naming:
+
+```typescript
+// ✅ Good: Semantic and hierarchical
+<Input data-testid="search-input" />
+<Button data-testid="submit-button" />
+<Button data-testid="cases-list-item-${caseId}" />
+<div data-testid="error-message" />
+<div data-testid="loading-spinner" />
+
+// ✅ Good: Component-specific with context
+<SearchInput data-testid="cases-search-input" />
+<Button data-testid="case-delete-button-${caseId}" />
+<PaginationControls data-testid="cases-pagination" />
+<Button data-testid="pagination-next-button" />
+
+// ❌ Bad: Too generic or unclear
+<Button data-testid="button" />
+<div data-testid="div1" />
+<Input data-testid="input" />
+```
+
+#### Implementation Examples
+
+**Form Example:**
+
+```typescript
+const LoginForm = () => {
+  return (
+    <form data-testid="login-form">
+      <Input
+        data-testid="email-input"
+        type="email"
+        placeholder="Email"
+      />
+      <Input
+        data-testid="password-input"
+        type="password"
+        placeholder="Password"
+      />
+      <Button data-testid="login-submit-button" type="submit">
+        Login
+      </Button>
+      {error && (
+        <div data-testid="login-error-message">{error}</div>
+      )}
+    </form>
+  )
+}
+```
+
+**List Example:**
+
+```typescript
+const CasesList = ({ cases }) => {
+  return (
+    <div data-testid="cases-list">
+      {isLoading && <Spinner data-testid="cases-loading" />}
+      {cases.map(case => (
+        <Card
+          key={case.id}
+          data-testid={`case-card-${case.id}`}
+        >
+          <h3 data-testid={`case-title-${case.id}`}>
+            {case.title}
+          </h3>
+          <Button
+            data-testid={`case-view-button-${case.id}`}
+            onClick={() => viewCase(case.id)}
+          >
+            View
+          </Button>
+          <Button
+            data-testid={`case-delete-button-${case.id}`}
+            onClick={() => deleteCase(case.id)}
+          >
+            Delete
+          </Button>
+        </Card>
+      ))}
+    </div>
+  )
+}
+```
+
+**Search Component Example:**
+
+```typescript
+const SearchInput = ({ onSearch }) => {
+  return (
+    <InputGroup data-testid="search-container">
+      <Input
+        data-testid="search-input"
+        placeholder="Search..."
+        onChange={handleChange}
+      />
+      <InputRightElement>
+        <IconButton
+          data-testid="search-clear-button"
+          icon={<FiX />}
+          onClick={handleClear}
+          aria-label="Clear search"
+        />
+      </InputRightElement>
+    </InputGroup>
+  )
+}
+```
+
+**Modal Example:**
+
+```typescript
+const DeleteModal = ({ isOpen, onClose, onConfirm }) => {
+  return (
+    <Modal isOpen={isOpen} onClose={onClose}>
+      <ModalContent data-testid="delete-modal">
+        <ModalHeader data-testid="delete-modal-header">
+          Confirm Delete
+        </ModalHeader>
+        <ModalBody data-testid="delete-modal-body">
+          Are you sure you want to delete this item?
+        </ModalBody>
+        <ModalFooter>
+          <Button
+            data-testid="delete-cancel-button"
+            onClick={onClose}
+          >
+            Cancel
+          </Button>
+          <Button
+            data-testid="delete-confirm-button"
+            onClick={onConfirm}
+            colorScheme="red"
+          >
+            Delete
+          </Button>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
+  )
+}
+```
+
+#### Dynamic Test IDs
+
+For dynamic content, include unique identifiers:
+
+```typescript
+// ✅ Good: Include unique identifiers for dynamic content
+{items.map(item => (
+  <div key={item.id} data-testid={`item-${item.id}`}>
+    <span data-testid={`item-name-${item.id}`}>{item.name}</span>
+    <Button data-testid={`item-edit-${item.id}`}>Edit</Button>
+    <Button data-testid={`item-delete-${item.id}`}>Delete</Button>
+  </div>
+))}
+
+// ✅ Good: Status-based test IDs
+<div data-testid={`order-status-${order.status}`}>
+  {order.status}
+</div>
+```
+
+#### State-Based Test IDs
+
+Include state information when relevant:
+
+```typescript
+// ✅ Good: Include state in test ID
+<Button
+  data-testid={`save-button${isDisabled ? '-disabled' : ''}`}
+  disabled={isDisabled}
+>
+  Save
+</Button>
+
+// ✅ Good: Loading states
+{isLoading ? (
+  <div data-testid="content-loading">Loading...</div>
+) : (
+  <div data-testid="content-loaded">{content}</div>
+)}
+```
+
+#### Best Practices
+
+1. **Be Consistent**: Use the same naming pattern across the application
+2. **Be Specific**: Make test IDs descriptive enough to understand their purpose
+3. **Avoid Duplication**: Ensure test IDs are unique within a page
+4. **Use for Key Elements**: Focus on elements that E2E tests will interact with
+5. **Document Complex IDs**: Add comments for complex dynamic test IDs
+6. **Don't Over-Test**: Not every div needs a test ID, focus on interactive and meaningful elements
+
+#### When NOT to Add data-testid
+
+**❌ Avoid adding data-testid to:**
+
+- Pure presentational elements with no semantic meaning
+- Wrapper divs that only provide layout
+- Elements that can be reliably selected by other means (e.g., unique text content)
+- Internal implementation details that tests shouldn't depend on
+
+## Accessibility Standards (WCAG 2.1 AA)
+
+### Overview
+
+**All code must follow WCAG 2.1 AA accessibility standards.** Accessibility is not optional - it's a requirement for inclusive design and legal compliance.
+
+### Semantic HTML
+
+**Always use semantic HTML elements instead of generic divs and spans when appropriate.**
+
+```typescript
+// ✅ Good: Semantic HTML
+<header data-testid="main-header">
+  <nav aria-label="Main navigation">
+    <ul>
+      <li><a href="/cases">Cases</a></li>
+      <li><a href="/documents">Documents</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main data-testid="main-content">
+  <section aria-labelledby="cases-heading">
+    <h2 id="cases-heading">Legal Cases</h2>
+    {/* Content */}
+  </section>
+</main>
+
+// ❌ Bad: Non-semantic HTML
+<div className="header">
+  <div className="nav">
+    <div className="nav-list">
+      <div className="nav-item"><a href="/cases">Cases</a></div>
+    </div>
+  </div>
+</div>
+
+<div className="main">
+  <div className="section">
+    <div className="heading">Legal Cases</div>
+    {/* Content */}
+  </div>
+</div>
+```
+
+### ARIA Attributes
+
+**Use ARIA attributes to enhance semantic meaning when native HTML elements aren't sufficient.**
+
+```typescript
+// ✅ Good: ARIA labels and descriptions
+<Button
+  aria-label="Delete case"
+  aria-describedby="delete-warning"
+>
+  <DeleteIcon />
+</Button>
+<div id="delete-warning" className="sr-only">
+  This action cannot be undone
+</div>
+
+// ✅ Good: ARIA live regions for dynamic content
+<div aria-live="polite" aria-atomic="true" data-testid="status-message">
+  {message}
+</div>
+
+// ✅ Good: ARIA expanded for collapsible content
+<Button
+  aria-expanded={isOpen}
+  aria-controls="collapsible-content"
+  onClick={toggle}
+>
+  Toggle Content
+</Button>
+<div id="collapsible-content" hidden={!isOpen}>
+  {/* Collapsible content */}
+</div>
+```
+
+### Keyboard Navigation
+
+**Ensure all interactive elements are keyboard accessible and follow logical tab order.**
+
+```typescript
+// ✅ Good: Keyboard navigation support
+const Modal = ({ isOpen, onClose, children }) => {
+  // Focus management
+  const modalRef = useRef<HTMLDivElement>(null)
+  const previousFocusRef = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    if (isOpen) {
+      previousFocusRef.current = document.activeElement as HTMLElement
+      modalRef.current?.focus()
+    } else {
+      previousFocusRef.current?.focus()
+    }
+  }, [isOpen])
+
+  // Handle escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose()
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape)
+      return () => document.removeEventListener('keydown', handleEscape)
+    }
+  }, [isOpen, onClose])
+
+  if (!isOpen) return null
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+      tabIndex={-1}
+      ref={modalRef}
+    >
+      <div className="modal-content">
+        <h2 id="modal-title">Modal Title</h2>
+        {children}
+        <Button onClick={onClose} aria-label="Close modal">
+          ×
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ✅ Good: Skip links for navigation
+const SkipLink = () => (
+  <a
+    href="#main-content"
+    className="skip-link"
+    onFocus={(e) => e.target.style.display = 'block'}
+    onBlur={(e) => e.target.style.display = 'none'}
+  >
+    Skip to main content
+  </a>
+)
+```
+
+### Focus Management
+
+**Provide clear visual focus indicators and manage focus programmatically.**
+
+```typescript
+// ✅ Good: Custom focus styles
+const focusStyles = {
+  outline: '2px solid #0078d4',
+  outlineOffset: '2px',
+  borderRadius: '4px',
+}
+
+// ✅ Good: Focus trapping in modals
+const useFocusTrap = (containerRef: RefObject<HTMLElement>) => {
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const focusableElements = container.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )
+    const firstElement = focusableElements[0] as HTMLElement
+    const lastElement = focusableElements[
+      focusableElements.length - 1
+    ] as HTMLElement
+
+    const handleTabKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return
+
+      if (e.shiftKey) {
+        if (document.activeElement === firstElement) {
+          lastElement.focus()
+          e.preventDefault()
+        }
+      } else {
+        if (document.activeElement === lastElement) {
+          firstElement.focus()
+          e.preventDefault()
+        }
+      }
+    }
+
+    container.addEventListener('keydown', handleTabKey)
+    return () => container.removeEventListener('keydown', handleTabKey)
+  }, [containerRef])
+}
+```
+
+### Screen Reader Support
+
+**Ensure content is accessible to screen readers with proper headings, labels, and descriptions.**
+
+```typescript
+// ✅ Good: Screen reader friendly forms
+const ContactForm = () => {
+  return (
+    <form aria-labelledby="contact-form-heading">
+      <h2 id="contact-form-heading">Contact Us</h2>
+
+      <div>
+        <Label htmlFor="name-input">Full Name</Label>
+        <Input
+          id="name-input"
+          type="text"
+          aria-describedby="name-help"
+          aria-required="true"
+        />
+        <div id="name-help" className="sr-only">
+          Enter your full legal name as it appears on official documents
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="email-input">Email Address</Label>
+        <Input
+          id="email-input"
+          type="email"
+          aria-describedby="email-error"
+          aria-invalid={hasEmailError}
+        />
+        {hasEmailError && (
+          <div id="email-error" role="alert" aria-live="polite">
+            Please enter a valid email address
+          </div>
+        )}
+      </div>
+
+      <Button type="submit" aria-describedby="submit-help">
+        Send Message
+      </Button>
+      <div id="submit-help" className="sr-only">
+        Submitting this form will send your message to our support team
+      </div>
+    </form>
+  )
+}
+
+// ✅ Good: Screen reader announcements for status changes
+const StatusMessage = ({ message, type = 'info' }: StatusMessageProps) => {
+  const [announced, setAnnounced] = useState(false)
+
+  useEffect(() => {
+    if (message && !announced) {
+      setAnnounced(true)
+      // Reset after announcement
+      setTimeout(() => setAnnounced(false), 1000)
+    }
+  }, [message, announced])
+
+  return (
+    <div
+      role={type === 'error' ? 'alert' : 'status'}
+      aria-live={type === 'error' ? 'assertive' : 'polite'}
+      aria-atomic="true"
+      className={`status-message status-${type}`}
+    >
+      {message}
+    </div>
+  )
+}
+```
+
+### Color and Contrast
+
+**Ensure sufficient color contrast and don't rely on color alone for conveying information.**
+
+```typescript
+// ✅ Good: Color contrast compliance
+const theme = {
+  colors: {
+    // Minimum 4.5:1 contrast ratio for normal text
+    text: '#1a1a1a', // Against white background
+    textMuted: '#666666', // Against white background
+
+    // For interactive elements
+    primary: '#0078d4',
+    primaryHover: '#106ebe',
+
+    // Error states with sufficient contrast
+    error: '#d13438',
+    errorLight: '#fed7d7',
+
+    // Success states
+    success: '#107c10',
+    successLight: '#dff6dd'
+  }
+}
+
+// ✅ Good: Don't rely on color alone
+const StatusBadge = ({ status, children }) => {
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'success': return 'green'
+      case 'error': return 'red'
+      case 'warning': return 'orange'
+      default: return 'gray'
+    }
+  }
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'success': return <CheckIcon />
+      case 'error': return <ErrorIcon />
+      case 'warning': return <WarningIcon />
+      default: return null
+    }
+  }
+
+  return (
+    <Badge
+      colorScheme={getStatusColor(status)}
+      display="flex"
+      alignItems="center"
+      gap={2}
+    >
+      {getStatusIcon(status)}
+      <span>{children}</span>
+    </Badge>
+  )
+}
+```
+
+### Images and Media
+
+**Provide alternative text for images and ensure media is accessible.**
+
+```typescript
+// ✅ Good: Images with alt text
+const ProfileCard = ({ user }) => {
+  return (
+    <Card>
+      <Image
+        src={user.avatar}
+        alt={`${user.name} profile picture`}
+        // Decorative images don't need alt text
+        // alt="" for decorative images
+      />
+      <Heading>{user.name}</Heading>
+      <Text>{user.role}</Text>
+    </Card>
+  )
+}
+
+// ✅ Good: Icons with screen reader support
+const ActionButton = ({ icon: Icon, label, onClick }) => {
+  return (
+    <IconButton
+      icon={<Icon />}
+      aria-label={label}
+      onClick={onClick}
+      // If icon is purely decorative, hide from screen readers
+      // aria-hidden="true"
+    />
+  )
+}
+
+// ✅ Good: Complex images with detailed descriptions
+const ChartComponent = ({ data }) => {
+  return (
+    <figure>
+      <ChartCanvas data={data} />
+      <figcaption className="sr-only">
+        Bar chart showing case statistics: Total cases - 150,
+        Resolved cases - 120 (80%), Pending cases - 30 (20%).
+        Monthly breakdown: January - 25 cases, February - 35 cases,
+        March - 40 cases, April - 50 cases.
+      </figcaption>
+    </figure>
+  )
+}
+```
+
+### Form Accessibility
+
+**Ensure all forms are accessible with proper labeling, validation, and error handling.**
+
+```typescript
+// ✅ Good: Accessible form with validation
+const LoginForm = () => {
+  const [errors, setErrors] = useState({})
+  const [touched, setTouched] = useState({})
+
+  const handleBlur = (field) => {
+    setTouched(prev => ({ ...prev, [field]: true }))
+  }
+
+  const getFieldError = (field) => {
+    return touched[field] && errors[field] ? errors[field] : null
+  }
+
+  return (
+    <form noValidate aria-labelledby="login-heading">
+      <h1 id="login-heading">Login to Your Account</h1>
+
+      <FormControl isInvalid={!!getFieldError('email')}>
+        <FormLabel htmlFor="email">Email Address</FormLabel>
+        <Input
+          id="email"
+          type="email"
+          aria-describedby={getFieldError('email') ? 'email-error' : 'email-help'}
+          aria-required="true"
+          onBlur={() => handleBlur('email')}
+        />
+        <FormHelperText id="email-help">
+          Enter the email address associated with your account
+        </FormHelperText>
+        <FormErrorMessage id="email-error">
+          {getFieldError('email')}
+        </FormErrorMessage>
+      </FormControl>
+
+      <FormControl isInvalid={!!getFieldError('password')}>
+        <FormLabel htmlFor="password">Password</FormLabel>
+        <Input
+          id="password"
+          type="password"
+          aria-describedby={getFieldError('password') ? 'password-error' : 'password-help'}
+          aria-required="true"
+          onBlur={() => handleBlur('password')}
+        />
+        <FormHelperText id="password-help">
+          Password must be at least 8 characters long
+        </FormHelperText>
+        <FormErrorMessage id="password-error">
+          {getFieldError('password')}
+        </FormErrorMessage>
+      </FormControl>
+
+      <Button type="submit" isLoading={isSubmitting}>
+        Sign In
+      </Button>
+    </form>
+  )
+}
+```
+
+### Error Handling for Accessibility
+
+**Provide clear, accessible error messages and recovery options.**
+
+```typescript
+// ✅ Good: Accessible error boundaries
+class AccessibleErrorBoundary extends Component {
+  state = { hasError: false, error: null }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error }
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // Log error for monitoring
+    console.error('Application error:', error, errorInfo)
+
+    // Announce error to screen readers
+    const announcement = document.createElement('div')
+    announcement.setAttribute('aria-live', 'assertive')
+    announcement.setAttribute('aria-atomic', 'true')
+    announcement.className = 'sr-only'
+    announcement.textContent = 'An error occurred. Please refresh the page or contact support.'
+    document.body.appendChild(announcement)
+
+    // Clean up announcement
+    setTimeout(() => {
+      document.body.removeChild(announcement)
+    }, 1000)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div role="alert" className="error-boundary">
+          <Heading as="h1">Something went wrong</Heading>
+          <Text mb={4}>
+            We're sorry, but something unexpected happened. Please try refreshing the page.
+          </Text>
+          <VStack spacing={3}>
+            <Button onClick={() => window.location.reload()}>
+              Refresh Page
+            </Button>
+            <Button variant="outline" as="a" href="/support">
+              Contact Support
+            </Button>
+          </VStack>
+        </div>
+      )
+    }
+
+    return this.props.children
+  }
+}
+
+// ✅ Good: Accessible loading states
+const AccessibleLoader = ({ message = 'Loading...' }) => {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      className="loading-container"
+    >
+      <Spinner size="lg" />
+      <Text ml={3}>{message}</Text>
+      <span className="sr-only">
+        {message}. Please wait while we load the content.
+      </span>
+    </div>
+  )
+}
+```
+
+### Accessibility Testing Checklist
+
+**Before committing code, ensure all of the following are met:**
+
+- [ ] All images have appropriate alt text or are marked as decorative
+- [ ] Color contrast meets WCAG AA standards (4.5:1 for normal text, 3:1 for large text)
+- [ ] All interactive elements are keyboard accessible
+- [ ] Focus indicators are visible and clear
+- [ ] Forms have proper labels and error messages
+- [ ] Dynamic content is announced to screen readers
+- [ ] Page has proper heading hierarchy (h1 → h2 → h3)
+- [ ] Modal dialogs trap focus and can be closed with Escape
+- [ ] Skip links are provided for keyboard navigation
+- [ ] ARIA attributes are used appropriately (not overused)
+- [ ] Screen reader testing has been performed
+- [ ] Color is not the only way information is conveyed
+
+### Accessibility Resources
+
+- [WCAG 2.1 Guidelines](https://www.w3.org/TR/WCAG21/)
+- [ARIA Authoring Practices Guide](https://www.w3.org/WAI/ARIA/apg/)
+- [WebAIM Contrast Checker](https://webaim.org/resources/contrastchecker/)
+- [axe-core Accessibility Testing](https://github.com/dequelabs/axe-core)

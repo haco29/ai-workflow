@@ -1,0 +1,261 @@
+---
+description: Chakra UI styling patterns and theme usage
+globs: ['src/**/*.{ts,tsx}']
+alwaysApply: false
+---
+
+# Chakra UI Styling Patterns
+
+## Chakra UI v2 Components
+
+```typescript
+// ✅ Good: Use Chakra UI components with theme
+import { Button, Box, Text, VStack, HStack } from '@chakra-ui/react'
+
+const UserCard = ({ user }: UserCardProps) => {
+  return (
+    <Box borderWidth="1px" borderRadius="lg" p={4} shadow="md">
+      <VStack spacing={3} align="stretch">
+        <Text fontSize="xl" fontWeight="bold">
+          {user.name}
+        </Text>
+        <HStack spacing={2}>
+          <Button colorScheme="blue" size="sm" onClick={handleEdit}>
+            Edit
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleDelete}>
+            Delete
+          </Button>
+        </HStack>
+      </VStack>
+    </Box>
+  )
+}
+```
+
+## UI Folder Components - Check First
+
+**Before building custom styled components, check `src/components/ui/` for existing solutions.**
+
+Many common UI patterns are already implemented in the components/ui/ folder:
+
+- GenericCard, MetricCard, EnhancedMetricCard
+- StatusBadge, ProgressRing, PriorityIndicator
+- Modal, ConfirmationModal
+- Input, InputForm, EditableInputForm
+- Select, MultiSelect, SearchInput
+- Table, ViewSwitcher, PaginationControls
+- And more...
+
+```typescript
+// ✅ Good: Use existing UI components
+import { GenericCard, StatusBadge } from '@/components/ui'
+
+const CaseCard = ({ case }) => {
+  return (
+    <GenericCard>
+      <StatusBadge status={case.status} />
+    </GenericCard>
+  )
+}
+
+// ✅ Good: Create new shared UI component in its own folder
+// src/components/ui/PriorityBadge/PriorityBadge.tsx
+export const PriorityBadge = ({ priority }) => {
+  return (
+    <Badge colorScheme={getPriorityColor(priority)}>
+      {priority}
+    </Badge>
+  )
+}
+
+// src/components/ui/PriorityBadge/index.ts
+export { PriorityBadge } from './PriorityBadge'
+
+// ❌ Bad: Building custom styled versions when UI components exist
+// Check components/ui/ folder first before creating new styled components
+```
+
+## Chakra Color Tokens - NO Hardcoded Values
+
+**Always use Chakra UI color tokens instead of hardcoded hex values or CSS variables.** This ensures consistency, maintainability, and proper theme support.
+
+### Quick Reference
+
+```typescript
+// Semantic text tokens (PREFER THESE)
+text.primary      // '#1A202C' (gray.900) - Main body text, active states
+text.secondary    // '#4A5568' (gray.700) - Labels, secondary info
+text.tertiary     // '#718096' (gray.600) - Less important text
+text.muted        // '#A0AEC0' (gray.500) - Muted text (backwards compatibility)
+text.disabled     // '#A0AEC0' (gray.500) - Disabled/readonly field values
+text.placeholder  // '#CBD5E0' (gray.400) - Input placeholder text
+
+// Raw color tokens (use when semantic tokens don't apply)
+gray.100, gray.200, gray.300, gray.600, gray.700
+white, black
+blue.500, red.500, green.500
+
+// Common conversions
+#ffffff → white
+#f7f8f9 → gray.100
+#e6e6e6 → gray.200
+#4a5568 → text.secondary
+#A0AEC0 → text.disabled (for readonly/disabled states)
+#CBD5E0 → text.placeholder (for input placeholders)
+```
+
+### Semantic vs Raw Tokens - Critical Pattern
+
+**ALWAYS prefer semantic tokens (like `text.muted`) over raw color values (like `gray.600`) when they convey the same intent.**
+
+#### ✅ Correct: Use Semantic Tokens
+
+```typescript
+// ✅ GOOD: Semantic tokens for text states
+<Input
+  value={value}
+  isReadOnly
+  color="text.disabled"  // ✅ Clearly indicates disabled/readonly state
+  placeholder="Enter value..."
+  _placeholder={{ color: 'text.placeholder' }}  // ✅ Semantic placeholder
+/>
+
+<Text color="text.primary">Active heading</Text>
+<Text color="text.secondary">Label text</Text>
+<Text color="text.disabled">Disabled field value</Text>
+
+// ✅ GOOD: Component with state-based semantic colors
+const EditableField = ({ isEditing, value }) => (
+  <Input
+    value={value}
+    color={isEditing ? "text.primary" : "text.disabled"}  // ✅ Semantic meaning
+    placeholder="Type here..."
+    _placeholder={{ color: 'text.placeholder' }}
+  />
+)
+
+// ✅ GOOD: Text component variants
+<Text variant="disabled">This field is read-only</Text>
+<Text variant="placeholder">Optional hint text</Text>
+```
+
+#### ❌ Incorrect: Using Raw Tokens When Semantic Exists
+
+```typescript
+// ❌ BAD: Using gray.600 when text.tertiary exists
+<Text color="gray.600">Less important text</Text>  // Should be text.tertiary
+
+// ❌ BAD: Using gray.500 for disabled text
+<Input
+  isReadOnly
+  color="gray.500"  // ❌ Should be text.disabled
+/>
+
+// ❌ BAD: Using gray.400 for placeholder
+<Input
+  placeholder="Name"
+  _placeholder={{ color: 'gray.400' }}  // ❌ Should be text.placeholder
+/>
+
+// ❌ BAD: Using gray.900 for main text
+<Heading color="gray.900">Title</Heading>  // ❌ Should be text.primary
+```
+
+#### When to Use Raw vs Semantic
+
+**Use Semantic Tokens For:**
+
+- Text color in any state (active, disabled, labels, placeholders)
+- Component states that have semantic meaning (readonly, disabled, placeholder)
+- Input placeholder text (`text.placeholder`)
+- Disabled or read-only field values (`text.disabled`)
+- Anything that conveys user intent or accessibility
+
+**Use Raw Tokens For:**
+
+- Backgrounds (`gray.100`, `gray.200`)
+- Borders (`gray.200`, `gray.300`)
+- UI elements without semantic meaning
+- Brand colors (`blue.500`, `primary.500`)
+
+### Examples
+
+```typescript
+// ✅ GOOD: Proper token usage
+<Box bg="white" borderColor="gray.200">
+  <Text color="text.primary">Heading</Text>
+  <Button bg="gray.100" color="text.secondary" _hover={{ bg: 'gray.200' }}>
+    Click
+  </Button>
+</Box>
+
+<Input
+  bg="white"
+  border="1px solid"
+  borderColor="gray.200"
+  color="text.primary"
+  _hover={{ borderColor: 'gray.300' }}
+/>
+
+// ❌ BAD: Don't use hex values or CSS variables
+<Box bg="#ffffff" borderColor="#e6e6e6">  // DON'T
+<Text color="var(--text/primary,#020219)">  // DON'T - use theme tokens
+<Input color="gray.500" />  // DON'T - use text.disabled for readonly
+<Input _placeholder={{ color: 'gray.400' }} />  // DON'T - use text.placeholder
+```
+
+## Verbit UI Library Components
+
+```typescript
+// ✅ Good: Use Verbit UI components when available
+import { VerbitButton, VerbitCard } from '@verbit-ai/verbit-ui-library'
+
+const DashboardCard = ({ title, children }: DashboardCardProps) => {
+  return (
+    <VerbitCard title={title} variant="elevated">
+      {children}
+    </VerbitCard>
+  )
+}
+```
+
+## Theme Usage
+
+```typescript
+// ✅ Good: Use Chakra theme values
+import { useTheme } from '@chakra-ui/react'
+
+const ThemedComponent = () => {
+  const theme = useTheme()
+
+  return (
+    <Box
+      bg={theme.colors.brand.primary}
+      color={theme.colors.white}
+      p={theme.space[4]}
+    >
+      Themed content
+    </Box>
+  )
+}
+```
+
+## Responsive Design
+
+```typescript
+// ✅ Good: Chakra UI responsive patterns
+<Box
+  display={{ base: 'block', md: 'flex' }}
+  flexDirection={{ base: 'column', md: 'row' }}
+  gap={{ base: 4, md: 6 }}
+  p={{ base: 4, md: 6, lg: 8 }}
+>
+  <Box flex={{ md: 1 }}>
+    Content
+  </Box>
+  <Box flex={{ md: 1 }}>
+    Sidebar
+  </Box>
+</Box>
+```

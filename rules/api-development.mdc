@@ -1,0 +1,109 @@
+---
+description: API development patterns and HttpClient usage
+globs: ['src/network/**/*', 'src/hooks/queries/**/*']
+alwaysApply: false
+---
+
+# API Development Guidelines
+
+## HttpClient Usage
+
+### Current API Structure
+
+- All requests go to **Orders API** (`https://orders.verbit.co/api/v2`)
+- HttpClient is simplified with specific methods only
+- No generic wrapper methods - only used methods are kept
+
+### Available Methods
+
+```typescript
+// Collections
+HttpClient.getCollections(params?)
+HttpClient.getCollection(id)
+
+// Sessions
+HttpClient.getSessions(params?)
+HttpClient.getSession(id)
+HttpClient.getSessionsByCollection(collectionId, params?)
+
+// Utility methods
+HttpClient.get(endpoint, params?)
+HttpClient.post(endpoint, data?)
+HttpClient.patch(endpoint, data?)
+HttpClient.delete(endpoint)
+```
+
+### Adding New Endpoints
+
+When adding new API endpoints, follow this pattern:
+
+```typescript
+static async createCollection(data: CreateCollectionData): Promise<Collection> {
+  return this.request<Collection>({
+    ...this.getDefaultConfig(),
+    method: 'POST',
+    url: '/collections',
+    data,
+  })
+}
+```
+
+## Query Hooks Pattern
+
+### React Query Integration
+
+```typescript
+// Good pattern - specific hooks
+export const useCollectionsQuery = (params?: CollectionsParams) => {
+  return useQuery({
+    queryKey: [COLLECTIONS_QUERY_KEY, params],
+    queryFn: () => HttpClient.getCollections(params),
+    retry: 2,
+  })
+}
+```
+
+### Error Handling
+
+- HttpClient automatically handles errors
+- Use React Query's error states
+- Global error listeners available via `HttpClient.addErrorListener()`
+- **Always use HTTP status constants from `@/constants/httpStatusCodes`**
+
+```typescript
+// ✅ Good: Use constants for status codes
+import {
+  AUTHENTICATION_ERROR_STATUS_CODE,
+  HTTP_STATUS,
+} from '@/constants/httpStatusCodes'
+
+HttpClient.addErrorListener((error) => {
+  if (error.response?.status === AUTHENTICATION_ERROR_STATUS_CODE) {
+    // Handle 401
+  }
+  if (error.response?.status === HTTP_STATUS.FORBIDDEN) {
+    // Handle 403
+  }
+})
+
+// ❌ Bad: Magic numbers
+if (error.response?.status === 401) {
+  // Don't use magic numbers
+}
+```
+
+## Best Practices
+
+### ✅ Do:
+
+- Use specific HttpClient methods for known endpoints
+- Handle errors at the component level with React Query
+- Keep query keys consistent and hierarchical
+- Use TypeScript interfaces for all API data
+
+### ❌ Don't:
+
+- Create generic wrapper methods unless actually used
+- Handle errors globally unless necessary
+- Mix different API endpoints in same methods
+- Skip type definitions for API responses

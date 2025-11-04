@@ -1,0 +1,542 @@
+---
+description: Testing patterns and accessibility compliance (WCAG 2.1 AA)
+globs: ['src/**/*.{ts,tsx}', 'tests/**/*.{ts,tsx}']
+alwaysApply: false
+---
+
+# Testing & Accessibility
+
+## Component Testing with userEvent
+
+**Always use `@testing-library/user-event` instead of `fireEvent` for user interactions.**
+
+**Key advantages:**
+
+- More realistic user behavior simulation
+- Async by default (avoids act() warnings)
+- Better accessibility testing
+- Proper keyboard navigation support
+
+**Basic pattern:**
+
+```typescript
+import userEvent from '@testing-library/user-event'
+
+it('handles user interaction', async () => {
+  const user = userEvent.setup()
+  render(<Component />)
+
+  await user.click(screen.getByRole('button'))
+  await user.type(screen.getByRole('textbox'), 'text')
+})
+```
+
+**Clean error testing:**
+
+```typescript
+// Mock console.error to suppress expected logs
+const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+// ... test error scenarios ...
+consoleSpy.mockRestore()
+```
+
+## React Testing Library Best Practices (Kent C. Dodds)
+
+**Follow Kent C. Dodds' testing principles: Test your software the way users actually use it.**
+
+### Core Principles
+
+1. **Test behavior, not implementation details**
+2. **Use queries that reflect how users interact with your app**
+3. **Avoid testing internal state or implementation**
+4. **Write tests that give you confidence your app works**
+
+### Query Priority
+
+**Use queries in this order of priority:**
+
+```typescript
+// 1. ✅ Accessible to everyone - BEST
+screen.getByRole('button', { name: /submit/i })
+screen.getByLabelText(/email address/i)
+
+// 2. ✅ Semantic queries - GOOD
+screen.getByPlaceholderText(/enter email/i)
+screen.getByText(/welcome back/i)
+screen.getByDisplayValue(/current value/i)
+
+// 3. ⚠️ Less semantic - USE SPARINGLY
+screen.getByAltText(/company logo/i)
+screen.getByTitle(/tooltip text/i)
+
+// 4. ❌ Last resort only - AVOID IF POSSIBLE
+screen.getByTestId('submit-button')
+
+// ❌ NEVER use these
+container.querySelector('.submit-button') // DON'T
+container.firstChild // DON'T
+```
+
+### Best Practices
+
+#### ✅ DO: Use screen and semantic queries
+
+```typescript
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+
+it('allows user to submit form', async () => {
+  const user = userEvent.setup()
+  const handleSubmit = vi.fn()
+
+  render(<LoginForm onSubmit={handleSubmit} />)
+
+  // Use semantic queries
+  await user.type(screen.getByLabelText(/email/i), 'user@example.com')
+  await user.type(screen.getByLabelText(/password/i), 'password123')
+  await user.click(screen.getByRole('button', { name: /log in/i }))
+
+  expect(handleSubmit).toHaveBeenCalledWith({
+    email: 'user@example.com',
+    password: 'password123',
+  })
+})
+```
+
+#### ❌ DON'T: Test implementation details
+
+```typescript
+// ❌ Bad: Testing internal state
+it('updates state on input change', () => {
+  const { container } = render(<SearchInput />)
+  const input = container.querySelector('input')
+
+  fireEvent.change(input, { target: { value: 'test' } })
+
+  // Don't test internal state
+  expect(component.state.searchTerm).toBe('test')
+})
+
+// ✅ Good: Test user-visible behavior
+it('displays search results when user types', async () => {
+  const user = userEvent.setup()
+  render(<SearchInput />)
+
+  await user.type(screen.getByRole('searchbox'), 'test query')
+
+  // Test what the user sees
+  expect(screen.getByText(/showing results for "test query"/i)).toBeInTheDocument()
+})
+```
+
+#### ✅ DO: Write longer, more comprehensive tests
+
+```typescript
+// ✅ Good: Test complete user flows
+it('completes checkout flow', async () => {
+  const user = userEvent.setup()
+  render(<CheckoutPage />)
+
+  // Fill shipping info
+  await user.type(screen.getByLabelText(/name/i), 'John Doe')
+  await user.type(screen.getByLabelText(/address/i), '123 Main St')
+  await user.click(screen.getByRole('button', { name: /continue/i }))
+
+  // Fill payment info
+  await user.type(screen.getByLabelText(/card number/i), '4242424242424242')
+  await user.click(screen.getByRole('button', { name: /place order/i }))
+
+  // Verify success
+  expect(screen.getByText(/order confirmed/i)).toBeInTheDocument()
+})
+```
+
+#### ❌ DON'T: Over-mock or use shallow rendering
+
+```typescript
+// ❌ Bad: Mocking child components
+it('renders user profile', () => {
+  vi.mock('./Avatar', () => ({ Avatar: () => <div>Avatar</div> }))
+  vi.mock('./UserInfo', () => ({ UserInfo: () => <div>Info</div> }))
+
+  render(<UserProfile />)
+  // Tests nothing meaningful
+})
+
+// ✅ Good: Render full component tree
+it('displays user information', () => {
+  const user = { name: 'John Doe', avatar: '/avatar.jpg' }
+
+  render(<UserProfile user={user} />)
+
+  expect(screen.getByText('John Doe')).toBeInTheDocument()
+  expect(screen.getByAltText(/john doe/i)).toHaveAttribute('src', '/avatar.jpg')
+})
+```
+
+#### ✅ DO: Query by role with accessible name
+
+```typescript
+// ✅ Good: Query by role and accessible name
+it('deletes item when delete button is clicked', async () => {
+  const user = userEvent.setup()
+  const handleDelete = vi.fn()
+
+  render(<TodoItem title="Buy milk" onDelete={handleDelete} />)
+
+  // Use role with name for specificity
+  await user.click(screen.getByRole('button', { name: /delete buy milk/i }))
+
+  expect(handleDelete).toHaveBeenCalled()
+})
+```
+
+#### ✅ DO: Use waitFor for async behavior
+
+```typescript
+// ✅ Good: Wait for async updates
+it('loads and displays user data', async () => {
+  render(<UserProfile userId="123" />)
+
+  // Show loading state
+  expect(screen.getByText(/loading/i)).toBeInTheDocument()
+
+  // Wait for data to load
+  expect(await screen.findByText('John Doe')).toBeInTheDocument()
+
+  // Loading state should be gone
+  expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+})
+```
+
+#### ❌ DON'T: Use arbitrary waitFor with empty callback
+
+```typescript
+// ❌ Bad: Waiting for arbitrary time
+await waitFor(() => {})
+await new Promise((resolve) => setTimeout(resolve, 1000))
+
+// ✅ Good: Wait for specific condition
+await waitFor(() => {
+  expect(screen.getByText(/loaded/i)).toBeInTheDocument()
+})
+
+// ✅ Better: Use findBy queries (waitFor built-in)
+expect(await screen.findByText(/loaded/i)).toBeInTheDocument()
+```
+
+### Key Takeaways
+
+- **Use `screen` for queries**: More consistent and easier to read
+- **Prefer getByRole**: Most accessible and reliable query
+- **Avoid testid**: Only use as last resort when semantic queries aren't possible
+- **Test user behavior**: Not implementation details like state or props
+- **Use userEvent**: Not fireEvent (already covered above)
+- **Write integration tests**: Test components working together, not in isolation
+- **Avoid shallow rendering**: Render the full component tree
+
+### Resources
+
+- [Kent C. Dodds Testing Blog](https://kentcdodds.com/blog/common-mistakes-with-react-testing-library)
+- [Testing Library Docs](https://testing-library.com/docs/queries/about#priority)
+- [Which Query Should I Use?](https://testing-library.com/docs/queries/about/)
+
+## E2E Testing Best Practices
+
+### Data Test IDs for E2E Testing
+
+**Always add `data-testid` attributes to key interactive and semantic elements for reliable E2E testing.**
+
+#### When to Add data-testid
+
+**✅ Always add data-testid to:**
+
+- Form inputs and controls
+- Buttons (especially CTAs and submit buttons)
+- Navigation elements and links
+- Modal/dialog containers and triggers
+- List items and cards (with unique identifiers)
+- Loading states and error messages
+- Key data display elements
+- Search inputs and filters
+- Pagination controls
+- Dropdown menus and selects
+- File upload areas
+- Toggle switches and checkboxes
+
+#### Naming Convention
+
+Use kebab-case with semantic, hierarchical naming:
+
+```typescript
+// ✅ Good: Semantic and hierarchical
+<Input data-testid="search-input" />
+<Button data-testid="submit-button" />
+<Button data-testid="cases-list-item-${caseId}" />
+<div data-testid="error-message" />
+<div data-testid="loading-spinner" />
+
+// ✅ Good: Component-specific with context
+<SearchInput data-testid="cases-search-input" />
+<Button data-testid="case-delete-button-${caseId}" />
+<PaginationControls data-testid="cases-pagination" />
+<Button data-testid="pagination-next-button" />
+
+// ❌ Bad: Too generic or unclear
+<Button data-testid="button" />
+<div data-testid="div1" />
+<Input data-testid="input" />
+```
+
+#### Implementation Examples
+
+**Form Example:**
+
+```typescript
+const LoginForm = () => {
+  return (
+    <form data-testid="login-form">
+      <Input
+        data-testid="email-input"
+        type="email"
+        placeholder="Email"
+      />
+      <Input
+        data-testid="password-input"
+        type="password"
+        placeholder="Password"
+      />
+      <Button data-testid="login-submit-button" type="submit">
+        Login
+      </Button>
+      {error && (
+        <div data-testid="login-error-message">{error}</div>
+      )}
+    </form>
+  )
+}
+```
+
+**List Example:**
+
+```typescript
+const CasesList = ({ cases }) => {
+  return (
+    <div data-testid="cases-list">
+      {isLoading && <Spinner data-testid="cases-loading" />}
+      {cases.map(case => (
+        <Card
+          key={case.id}
+          data-testid={`case-card-${case.id}`}
+        >
+          <h3 data-testid={`case-title-${case.id}`}>
+            {case.title}
+          </h3>
+          <Button
+            data-testid={`case-view-button-${case.id}`}
+            onClick={() => viewCase(case.id)}
+          >
+            View
+          </Button>
+          <Button
+            data-testid={`case-delete-button-${case.id}`}
+            onClick={() => deleteCase(case.id)}
+          >
+            Delete
+          </Button>
+        </Card>
+      ))}
+    </div>
+  )
+}
+```
+
+#### Dynamic Test IDs
+
+For dynamic content, include unique identifiers:
+
+```typescript
+// ✅ Good: Include unique identifiers for dynamic content
+{items.map(item => (
+  <div key={item.id} data-testid={`item-${item.id}`}>
+    <span data-testid={`item-name-${item.id}`}>{item.name}</span>
+    <Button data-testid={`item-edit-${item.id}`}>Edit</Button>
+    <Button data-testid={`item-delete-${item.id}`}>Delete</Button>
+  </div>
+))}
+
+// ✅ Good: Status-based test IDs
+<div data-testid={`order-status-${order.status}`}>
+  {order.status}
+</div>
+```
+
+#### Best Practices
+
+1. **Be Consistent**: Use the same naming pattern across the application
+2. **Be Specific**: Make test IDs descriptive enough to understand their purpose
+3. **Avoid Duplication**: Ensure test IDs are unique within a page
+4. **Use for Key Elements**: Focus on elements that E2E tests will interact with
+5. **Document Complex IDs**: Add comments for complex dynamic test IDs
+6. **Don't Over-Test**: Not every div needs a test ID, focus on interactive and meaningful elements
+
+#### When NOT to Add data-testid
+
+**❌ Avoid adding data-testid to:**
+
+- Pure presentational elements with no semantic meaning
+- Wrapper divs that only provide layout
+- Elements that can be reliably selected by other means (e.g., unique text content)
+- Internal implementation details that tests shouldn't depend on
+
+## Accessibility Standards (WCAG 2.1 AA)
+
+**All code must follow WCAG 2.1 AA accessibility standards.** For detailed guidelines, see [WCAG 2.1](https://www.w3.org/TR/WCAG21/).
+
+### Key Patterns
+
+#### Semantic HTML
+
+Always use semantic HTML elements:
+
+```typescript
+// ✅ Good: Semantic HTML
+<header>
+  <nav aria-label="Main navigation">
+    <ul>
+      <li><a href="/cases">Cases</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main>
+  <section aria-labelledby="heading-id">
+    <h2 id="heading-id">Content</h2>
+  </section>
+</main>
+
+// ❌ Bad: Non-semantic
+<div className="header">
+  <div className="nav">...</div>
+</div>
+```
+
+#### ARIA Attributes
+
+Use ARIA when HTML isn't sufficient:
+
+```typescript
+// ✅ Good: ARIA labels
+<Button aria-label="Delete case" aria-describedby="delete-warning">
+  <DeleteIcon />
+</Button>
+
+// ✅ Good: Live regions for dynamic content
+<div aria-live="polite" aria-atomic="true">
+  {statusMessage}
+</div>
+
+// ✅ Good: Collapsible content
+<Button
+  aria-expanded={isOpen}
+  aria-controls="content-id"
+  onClick={toggle}
+>
+  Toggle
+</Button>
+```
+
+#### Keyboard Navigation
+
+Ensure keyboard accessibility:
+
+```typescript
+// ✅ Good: Keyboard support
+const Modal = ({ isOpen, onClose }) => {
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape)
+      return () => document.removeEventListener('keydown', handleEscape)
+    }
+  }, [isOpen, onClose])
+
+  return (
+    <div role="dialog" aria-modal="true" tabIndex={-1}>
+      {children}
+    </div>
+  )
+}
+```
+
+#### Forms
+
+Proper form labeling:
+
+```typescript
+// ✅ Good: Accessible forms
+<FormControl isInvalid={hasError}>
+  <FormLabel htmlFor="email">Email</FormLabel>
+  <Input
+    id="email"
+    type="email"
+    aria-describedby={hasError ? 'email-error' : 'email-help'}
+    aria-required="true"
+  />
+  <FormHelperText id="email-help">
+    Enter your email address
+  </FormHelperText>
+  {hasError && (
+    <FormErrorMessage id="email-error" role="alert" aria-live="polite">
+      {errorMessage}
+    </FormErrorMessage>
+  )}
+</FormControl>
+```
+
+#### Color and Contrast
+
+```typescript
+// ✅ Good: Don't rely on color alone
+const StatusBadge = ({ status }) => {
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'success': return <CheckIcon />
+      case 'error': return <ErrorIcon />
+      case 'warning': return <WarningIcon />
+      default: return null
+    }
+  }
+
+  return (
+    <Badge colorScheme={getStatusColor(status)}>
+      {getStatusIcon(status)}
+      <span>{status}</span>
+    </Badge>
+  )
+}
+```
+
+### Quick Checklist
+
+Before committing, verify:
+
+- [ ] All images have alt text or are marked decorative
+- [ ] Color contrast meets WCAG AA (4.5:1 for text, 3:1 for large text)
+- [ ] All interactive elements are keyboard accessible
+- [ ] Focus indicators are visible
+- [ ] Forms have proper labels and error messages
+- [ ] Dynamic content is announced to screen readers
+- [ ] Proper heading hierarchy (h1 → h2 → h3)
+- [ ] Modals trap focus and close with Escape
+- [ ] ARIA attributes used appropriately
+
+### Resources
+
+- [WCAG 2.1 Guidelines](https://www.w3.org/TR/WCAG21/)
+- [ARIA Authoring Practices](https://www.w3.org/WAI/ARIA/apg/)
+- [WebAIM Contrast Checker](https://webaim.org/resources/contrastchecker/)
+- [axe-core Testing](https://github.com/dequelabs/axe-core)

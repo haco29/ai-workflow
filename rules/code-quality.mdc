@@ -1,0 +1,282 @@
+---
+description: Code quality patterns for constants and error handling
+globs: ['src/**/*.{ts,tsx}']
+alwaysApply: false
+---
+
+# Code Quality Patterns
+
+## Constants and Magic Numbers
+
+### HTTP Status Codes
+
+**Always use constants from the centralized httpStatusCodes file instead of magic numbers.**
+
+```typescript
+// ✅ Good: Use constants
+import {
+  AUTHENTICATION_ERROR_STATUS_CODE,
+  HTTP_STATUS,
+} from '@/constants/httpStatusCodes'
+
+if (error.response?.status === AUTHENTICATION_ERROR_STATUS_CODE) {
+  // Handle 401
+}
+
+if (error.response?.status === HTTP_STATUS.NOT_FOUND) {
+  // Handle 404
+}
+
+// ❌ Bad: Magic numbers
+if (error.response?.status === 401) {
+  // Don't use magic numbers
+}
+```
+
+### Other Constants
+
+**Define constants for any repeated values or configuration.**
+
+```typescript
+// ✅ Good: Constants file
+// constants/pagination.ts
+export const DEFAULT_PAGE_SIZE = 10
+export const MAX_PAGE_SIZE = 100
+
+// constants/validation.ts
+export const MIN_PASSWORD_LENGTH = 8
+export const MAX_FILE_SIZE_MB = 10
+
+// Usage
+import { DEFAULT_PAGE_SIZE } from '@/constants/pagination'
+```
+
+## Error Handling
+
+### 1. Local Error State with useState
+
+**Use local state for component-specific errors (form validation, user input, etc.).**
+
+```typescript
+// ✅ Good: Local error state for user input validation
+const EditableInput: React.FC = ({ value, onSave }) => {
+  const [editValue, setEditValue] = useState(value)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSave = async () => {
+    // Validate before saving
+    if (!editValue.trim()) {
+      setError('This field is required')
+      return
+    }
+
+    setError(null)
+
+    try {
+      await onSave(editValue)
+    } catch (_err) {
+      setError('Failed to save. Please try again.')
+    }
+  }
+
+  return (
+    <div>
+      <input value={editValue} onChange={(e) => setEditValue(e.target.value)} />
+      {error && <span role="alert">{error}</span>}
+    </div>
+  )
+}
+```
+
+### 2. React Query Mutations with Error Handling
+
+**Use React Query's onError callback for API mutations.**
+
+```typescript
+// ✅ Good: Centralized error handling in mutation hooks
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useToast } from '@chakra-ui/react'
+import { AxiosError } from 'axios'
+
+export const useUpdateCaseMutation = () => {
+  const queryClient = useQueryClient()
+  const toast = useToast()
+
+  return useMutation<Collection, AxiosError, UpdateCaseMutationProps>({
+    mutationFn: async ({ id, payload }) => {
+      return await HttpClient.updateCollection(id, payload)
+    },
+    onSuccess: (_data, { id }) => {
+      queryClient.invalidateQueries({ queryKey: [CASE_QUERY_KEY, id] })
+    },
+    onError: (error) => {
+      toast({
+        title: 'Update Failed',
+        description:
+          error.message || 'Failed to update case. Please try again.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      })
+    },
+  })
+}
+
+// Usage in component
+const MyComponent = () => {
+  const updateMutation = useUpdateCaseMutation()
+
+  const handleUpdate = async () => {
+    try {
+      await updateMutation.mutateAsync({ id, payload })
+      // Handle success (errors are handled by mutation hook)
+    } catch (_error) {
+      // Error toast already shown by mutation hook
+      // Component can handle additional UI state if needed
+    }
+  }
+}
+```
+
+### 3. Custom Error Handling Hooks
+
+**Extract reusable error handling logic into custom hooks.**
+
+```typescript
+// ✅ Good: Reusable network error handler
+const useHandleNetworkError = () => {
+  return useCallback((err: unknown) => {
+    if (axios.isAxiosError(err)) {
+      const status = err.response?.status
+
+      if (status === AUTHENTICATION_ERROR_STATUS_CODE) {
+        // Redirect to login
+        window.location.href = getLoginUrl()
+      } else {
+        // Handle other errors
+        console.error('Network error:', err)
+      }
+    }
+  }, [])
+}
+```
+
+### 4. Error Message Extraction Utilities
+
+**Use utilities to extract user-friendly error messages from API responses.**
+
+```typescript
+// ✅ Good: Centralized error message extraction
+import { HTTP_STATUS } from '@/constants/httpStatusCodes'
+
+export function extractErrorMessage(
+  error: unknown,
+  defaultMessage = 'An unexpected error occurred'
+): string {
+  const apiError = error as ApiError
+
+  // Check for structured error format
+  if (apiError?.response?.data?.errors?.length > 0) {
+    return apiError.response.data.errors[0].message || defaultMessage
+  }
+
+  // Check for direct message
+  if (apiError?.response?.data?.message) {
+    return apiError.response.data.message
+  }
+
+  // Status-specific fallback messages
+  if (apiError?.response?.status) {
+    switch (apiError.response.status) {
+      case HTTP_STATUS.BAD_REQUEST:
+        return 'Invalid request. Please check your input and try again.'
+      case HTTP_STATUS.NOT_FOUND:
+        return 'The requested resource was not found.'
+      case HTTP_STATUS.INTERNAL_SERVER_ERROR:
+        return 'A server error occurred. Please try again later.'
+      default:
+        return defaultMessage
+    }
+  }
+
+  return apiError?.message || defaultMessage
+}
+
+// Usage with toast
+toast({
+  title: 'Error',
+  description: extractErrorMessage(error),
+  status: 'error',
+})
+```
+
+### 5. Form Error Handling with React Hook Form
+
+**Use Controller for form field validation and error display.**
+
+```typescript
+// ✅ Good: Form validation with react-hook-form
+import { Controller, useForm } from 'react-hook-form'
+
+const MyForm = () => {
+  const { control, handleSubmit } = useForm()
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <Controller
+        name="email"
+        control={control}
+        rules={{
+          required: 'Email is required',
+          pattern: {
+            value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+            message: 'Invalid email address',
+          },
+        }}
+        render={({ field, fieldState: { error } }) => (
+          <div>
+            <input {...field} aria-invalid={!!error} />
+            {error && <span role="alert">{error.message}</span>}
+          </div>
+        )}
+      />
+    </form>
+  )
+}
+```
+
+### 6. Try-Catch with User Feedback
+
+**Always provide user feedback when catching errors.**
+
+```typescript
+// ✅ Good: Catch errors and show toast
+const handleSave = async () => {
+  try {
+    await onStatusUpdate(itemId, status, notes)
+
+    toast({
+      title: 'Status Updated',
+      description: 'Your changes have been saved.',
+      status: 'success',
+      duration: 3000,
+    })
+  } catch (_error) {
+    toast({
+      title: 'Update Failed',
+      description: 'Failed to save your changes. Please try again.',
+      status: 'error',
+      duration: 5000,
+    })
+  }
+}
+
+// ❌ Bad: Silent failure
+const handleSave = async () => {
+  try {
+    await onStatusUpdate(itemId, status, notes)
+  } catch (_error) {
+    // No user feedback!
+  }
+}
+```

@@ -1,0 +1,625 @@
+---
+description: Core React and TypeScript patterns for component architecture
+globs: ['src/**/*.{ts,tsx}']
+alwaysApply: false
+---
+
+# React & TypeScript Patterns
+
+## Component Structure
+
+### File Organization
+
+```
+components/
+  FeatureName/
+    FeatureName.tsx          # Main component
+    FeatureName.spec.tsx     # Tests
+    index.ts                 # Exports
+    types.ts                 # TypeScript interfaces (if needed)
+
+  ui/
+    SharedComponent/         # Reusable UI components (each in own folder)
+      SharedComponent.tsx
+      SharedComponent.spec.tsx
+      index.ts
+```
+
+### UI Folder Components - Reusability First
+
+**Always check the `ui/` folder for existing components before creating new ones. Consider adding new components to `ui/` if they could be reused.**
+
+**Before creating a new component, ask:**
+
+1. Does a similar component already exist in `src/components/ui/`?
+2. Could this component be used in multiple places?
+3. Is this a generic UI pattern (buttons, inputs, cards, modals)?
+
+```typescript
+// ✅ Good: Use existing UI components
+import { GenericCard, EditableInputForm } from '@/components/ui'
+
+const UserProfile = () => {
+  return (
+    <GenericCard>
+      <EditableInputForm label="Name" name="name" control={control} />
+    </GenericCard>
+  )
+}
+
+// ✅ Good: Create new UI component in its own folder for shared use
+// src/components/ui/StatusBadge/StatusBadge.tsx
+export const StatusBadge = ({ status, label }) => {
+  return (
+    <Badge colorScheme={getStatusColor(status)}>
+      {label}
+    </Badge>
+  )
+}
+
+// src/components/ui/StatusBadge/index.ts
+export { StatusBadge } from './StatusBadge'
+export type { StatusBadgeProps } from './StatusBadge'
+
+// ❌ Bad: Creating similar components in multiple feature folders
+// Don't duplicate UI patterns - extract to components/ui/ folder instead
+```
+
+**When to add to components/ui/ folder:**
+
+- Generic UI patterns (buttons, inputs, cards, badges)
+- Components used in 2+ different features
+- Design system components
+- Layout components (modals, drawers, containers)
+
+**When to keep in feature folder:**
+
+- Feature-specific business logic
+- Components tightly coupled to a single feature
+- Complex domain-specific components
+
+### Component Patterns
+
+```typescript
+// ✅ Good: Named export with interface
+interface UserCardProps {
+  user: User
+  onEdit?: (user: User) => void
+}
+
+export const UserCard = ({ user, onEdit }: UserCardProps) => {
+  return (
+    <div className="user-card">
+      <h3>{user.name}</h3>
+      {onEdit && (
+        <button onClick={() => onEdit(user)}>
+          Edit
+        </button>
+      )}
+    </div>
+  )
+}
+```
+
+### Component Architecture & Separation of Concerns
+
+#### Keep Components Clean and Focused
+
+**❌ Bad: Large component with mixed responsibilities**
+
+```typescript
+const CasesView: React.FC = () => {
+  const [currentPage, setCurrentPage] = useState(1)
+  const [searchTerm, setSearchTerm] = useState('')
+
+  // Business logic mixed with UI
+  const handlePageChange = (page: number) => setCurrentPage(page)
+  const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString()
+
+  // Complex pagination calculations
+  const totalPages = Math.ceil(totalItems / itemsPerPage)
+  const offset = (currentPage - 1) * itemsPerPage
+
+  return (
+    <Box>
+      {/* Mixed UI concerns */}
+      <Input placeholder="Search..." value={searchTerm} onChange={handleSearch} />
+      <VStack>
+        {cases.map(case => (
+          <Card key={case.id}>
+            <Text>{case.name}</Text>
+            <Text>{formatDate(case.createdAt)}</Text>
+          </Card>
+        ))}
+      </VStack>
+      {/* Inline pagination controls */}
+      <HStack>
+        <Button onClick={() => handlePageChange(currentPage - 1)}>Prev</Button>
+        {Array.from({ length: totalPages }, (_, i) => (
+          <Button key={i} onClick={() => handlePageChange(i + 1)}>{i + 1}</Button>
+        ))}
+        <Button onClick={() => handlePageChange(currentPage + 1)}>Next</Button>
+      </HStack>
+    </Box>
+  )
+}
+```
+
+**✅ Good: Separated concerns with hooks and reusable components**
+
+```typescript
+// Custom hook for pagination logic
+const usePagination = (totalItems: number, itemsPerPage: number) => {
+  const [currentPage, setCurrentPage] = useState(1)
+  const totalPages = Math.ceil(totalItems / itemsPerPage)
+  const offset = (currentPage - 1) * itemsPerPage
+
+  return {
+    currentPage,
+    totalPages,
+    offset,
+    goToPage: (page: number) => setCurrentPage(page),
+    goToNextPage: () => setCurrentPage(prev => prev + 1),
+    goToPrevPage: () => setCurrentPage(prev => prev - 1),
+  }
+}
+
+// Reusable pagination component
+const PaginationControls: React.FC<PaginationControlsProps> = ({
+  currentPage,
+  totalPages,
+  onPageChange,
+  onPrevPage,
+  onNextPage,
+}) => {
+  return (
+    <HStack>
+      <Button onClick={onPrevPage}>Previous</Button>
+      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+        const pageNum = Math.max(1, currentPage - 2) + i
+        return (
+          <Button key={pageNum} onClick={() => onPageChange(pageNum)}>
+            {pageNum}
+          </Button>
+        )
+      })}
+      <Button onClick={onNextPage}>Next</Button>
+    </HStack>
+  )
+}
+
+// Clean, focused component
+const CasesView: React.FC = () => {
+  const pagination = usePagination(totalItems, ITEMS_PER_PAGE)
+  const { data: cases } = useCasesQuery({
+    limit: ITEMS_PER_PAGE,
+    offset: pagination.offset,
+  })
+
+  return (
+    <VStack spacing={6}>
+      <VStack spacing={4}>
+        {cases?.map(case => (
+          <GenericCard key={case.id}>
+            <Text>{case.name}</Text>
+            <Text>{formatDate(case.createdAt)}</Text>
+          </GenericCard>
+        ))}
+      </VStack>
+
+      <PaginationControls
+        currentPage={pagination.currentPage}
+        totalPages={pagination.totalPages}
+        onPageChange={pagination.goToPage}
+        onPrevPage={pagination.goToPrevPage}
+        onNextPage={pagination.goToNextPage}
+      />
+    </VStack>
+  )
+}
+```
+
+#### Best Practices for Component Separation
+
+**🎯 Single Responsibility Principle**
+
+- Each component should have one clear purpose
+- Extract complex logic into custom hooks
+- Create reusable UI components for repeated patterns
+
+**🔧 Custom Hooks for Logic**
+
+```typescript
+// ✅ Extract business logic to hooks
+const usePagination = (totalItems: number, itemsPerPage: number) => {
+  // Logic here
+}
+
+const useSearch = (items: Item[]) => {
+  const [searchTerm, setSearchTerm] = useState('')
+  const filteredItems = useMemo(() => {
+    return items.filter((item) =>
+      item.name.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  }, [items, searchTerm])
+
+  return { searchTerm, setSearchTerm, filteredItems }
+}
+```
+
+**🧩 Reusable UI Components**
+
+```typescript
+// ✅ Create reusable components
+const PaginationControls = ({ currentPage, totalPages, onPageChange }) => {
+  // UI logic here
+}
+
+const DataTable = ({ data, columns, onSort }) => {
+  // Table logic here
+}
+
+const SearchInput = ({ value, onChange, placeholder }) => {
+  // Search UI here
+}
+```
+
+**📁 File Organization for Separation**
+
+```
+components/
+  Cases/
+    CasesView.tsx          # Main component (UI orchestration)
+    CasesList.tsx          # Cases display logic
+    CaseCard.tsx           # Individual case component
+    index.ts              # Clean exports
+
+  ui/
+    PaginationControls/    # Reusable pagination (in own folder)
+      PaginationControls.tsx
+      index.ts
+    SearchInput/          # Reusable search (in own folder)
+      SearchInput.tsx
+      index.ts
+    DataTable/            # Reusable table (in own folder)
+      DataTable.tsx
+      index.ts
+
+hooks/
+  usePagination.ts       # Pagination logic
+  useSearch.ts          # Search logic
+  useCasesQuery.ts      # Data fetching
+```
+
+#### When to Extract Components
+
+**Extract when:**
+
+- Component has > 200 lines
+- Component has multiple responsibilities
+- Logic is reused across components
+- Component has complex state management
+- Component handles multiple data transformations
+
+**Keep together when:**
+
+- Component is small and focused (< 100 lines)
+- Logic is unique to that component
+- Component is a simple wrapper/presenter
+
+## State Management
+
+### React Query for Server State
+
+```typescript
+// ✅ Good: Use React Query for API data
+const useUsersQuery = () => {
+  return useQuery({
+    queryKey: ['users'],
+    queryFn: () => HttpClient.getUsers(),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  })
+}
+```
+
+### Local State
+
+```typescript
+// ✅ Good: useState for local UI state
+const [isEditing, setIsEditing] = useState(false)
+const [formData, setFormData] = useState(initialData)
+```
+
+## TypeScript Best Practices
+
+### Derive Types from Backend Types - Critical Pattern
+
+**Almost all our types are derived from the backend.** Instead of redefining primitive types, always use `Pick` or `Omit` to derive component props from backend types.
+
+#### ✅ Correct: Derive from Backend Types
+
+```typescript
+// Backend type (from src/network/types.ts)
+interface Case {
+  id: string
+  name: string
+  user_case_id: string | null
+  created_at: string
+  updated_at: string
+  status: string
+}
+
+// ✅ Good: Use Pick to derive component props
+interface CaseSettingsContentProps {
+  caseData: Pick<Case, 'id' | 'name' | 'user_case_id'>
+}
+
+export const CaseSettingsContent: React.FC<CaseSettingsContentProps> = ({
+  caseData,
+}) => {
+  // caseData.id, caseData.name, caseData.user_case_id are all properly typed
+  return <SettingsForm caseData={caseData} />
+}
+
+// ✅ Good: Use Omit to exclude fields
+interface CaseListItemProps {
+  case: Omit<Case, 'created_at' | 'updated_at'>
+}
+
+// ✅ Good: Extend backend types when adding UI-specific props
+interface CaseCardProps {
+  case: Pick<Case, 'id' | 'name' | 'status'>
+  onEdit?: (id: string) => void
+  isSelected?: boolean
+}
+```
+
+#### ❌ Incorrect: Redefining Primitive Types
+
+```typescript
+// ❌ BAD: Manually redefining types that already exist in backend types
+interface CaseSettingsContentProps {
+  caseId: string // ❌ Don't redefine - use Pick<Case, 'id'>
+  caseName: string // ❌ Don't redefine - use Pick<Case, 'name'>
+  docketNumber: string | null // ❌ Don't redefine - use Pick<Case, 'user_case_id'>
+}
+
+// ❌ BAD: Duplicating entire backend type structure
+interface CaseCardProps {
+  id: string // ❌ Duplicates Case.id
+  name: string // ❌ Duplicates Case.name
+  status: string // ❌ Duplicates Case.status
+}
+```
+
+### Interface Definitions
+
+```typescript
+// ✅ Good: Define interfaces for props and data with descriptive generic names
+interface ApiResponse<ResponseData> {
+  data: ResponseData
+  pagination?: Pagination
+  error?: string
+}
+
+interface User {
+  id: string
+  name: string
+  email: string
+  createdAt: string
+}
+```
+
+### Generic Type Parameter Naming
+
+**Always use descriptive names for generic type parameters instead of single letters.**
+
+Single-letter generics like `T`, `K`, `V` make code harder to read and understand. Use descriptive names that explain what the generic represents.
+
+#### ✅ Correct: Descriptive Generic Names
+
+```typescript
+// ✅ Good: Clear what the generic represents
+interface ApiResponse<ResponseData> {
+  data: ResponseData
+  pagination?: Pagination
+  error?: string
+}
+
+// ✅ Good: Descriptive mapped type key
+export type FormData = Required<{
+  [FieldKey in keyof CollectionEditRequest]: NonNullable<
+    CollectionEditRequest[FieldKey]
+  >
+}>
+
+// ✅ Good: Multiple generics with clear names
+interface Dictionary<KeyType, ValueType> {
+  get(key: KeyType): ValueType | undefined
+  set(key: KeyType, value: ValueType): void
+}
+
+// ✅ Good: Component with descriptive generic
+interface SelectProps<OptionValue> {
+  options: Array<{ value: OptionValue; label: string }>
+  onChange: (value: OptionValue) => void
+}
+```
+
+#### ❌ Incorrect: Single-Letter Generics
+
+```typescript
+// ❌ BAD: What does T represent?
+interface ApiResponse<T> {
+  data: T
+  pagination?: Pagination
+  error?: string
+}
+
+// ❌ BAD: What does K mean?
+export type FormData = Required<{
+  [K in keyof CollectionEditRequest]: NonNullable<CollectionEditRequest[K]>
+}>
+
+// ❌ BAD: K and V are cryptic
+interface Dictionary<K, V> {
+  get(key: K): V | undefined
+  set(key: K, value: V): void
+}
+```
+
+#### Common Naming Patterns
+
+- `ResponseData`, `RequestData`, `PayloadData` - for API data types
+- `FieldKey`, `PropertyKey`, `RecordKey` - for object keys in mapped types
+- `ItemType`, `ElementType` - for array/collection elements
+- `OptionValue`, `SelectValue` - for select/dropdown values
+- `EntityType`, `ModelType` - for domain models
+
+### Generic Components
+
+```typescript
+// ✅ Good: Generic components with proper constraints and descriptive names
+interface SelectProps<OptionType> {
+  options: OptionType[]
+  value: OptionType | null
+  onChange: (value: OptionType) => void
+  getLabel: (item: OptionType) => string
+}
+
+export const Select = <OptionType extends { id: string }>({
+  options,
+  value,
+  onChange,
+  getLabel,
+}: SelectProps<OptionType>) => {
+  // Implementation
+}
+```
+
+### TypeScript Generics in JSX - Build Tool Compatibility
+
+**Important: Avoid unnecessary generic syntax in JSX to prevent build tool conflicts.**
+
+#### The Problem: Build Tool Conflicts
+
+Some build tools and plugins (like `lovable-tagger`) can conflict with TypeScript generic syntax in JSX:
+
+```typescript
+// ❌ Problematic: Can cause build errors with certain plugins
+<MultiSelect<string>
+  options={options}
+  selectedValues={selected}
+  onChange={onChange}
+/>
+```
+
+#### The Solution: Use Default Generic Types
+
+**Always prefer default generic types over explicit generic syntax when possible:**
+
+```typescript
+// ✅ Good: Component definition with default generic type
+export const MultiSelect = <T extends string | number = string>({
+  options,
+  selectedValues,
+  onChange,
+  // ... other props
+}: MultiSelectProps<T>) => {
+  // Implementation
+}
+
+// ✅ Good: Usage without generic syntax (uses default 'string' type)
+<MultiSelect
+  options={options}
+  selectedValues={selected}
+  onChange={onChange}
+/>
+
+// ❌ Unnecessary: Don't specify generic if it's the default
+<MultiSelect<string>  // 'string' is already the default
+  options={options}
+  selectedValues={selected}
+  onChange={onChange}
+/>
+```
+
+#### When Generic Syntax is Needed
+
+Only use explicit generic syntax when you need a type other than the default:
+
+```typescript
+// ✅ Good: Explicit generic needed for non-default type
+<MultiSelect<number>
+  options={numberOptions}
+  selectedValues={selectedNumbers}
+  onChange={handleNumberChange}
+/>
+
+// ✅ Good: Custom type requires explicit generic
+interface CustomOption {
+  id: string
+  label: string
+}
+
+<MultiSelect<CustomOption>
+  options={customOptions}
+  selectedValues={selectedCustom}
+  onChange={handleCustomChange}
+/>
+```
+
+#### Key Lessons
+
+1. **Question the necessity**: Always ask "Do I really need explicit generic syntax here?"
+2. **Default types are powerful**: Well-designed default generic types eliminate most explicit usage
+3. **KISS principle**: Simpler code is better code - avoid over-engineering
+4. **Build tool compatibility**: Consider how build tools might interpret your TypeScript syntax
+5. **Type safety preserved**: Default generics still provide full type checking and IntelliSense
+
+## Performance Considerations
+
+### Memoization
+
+```typescript
+// ✅ Good: Memoize expensive calculations
+const expensiveValue = useMemo(() => {
+  return heavyCalculation(props.data)
+}, [props.data])
+
+// ✅ Good: Memoize callbacks
+const handleClick = useCallback(() => {
+  doSomething(props.id)
+}, [props.id])
+
+// ✅ Good: Memoize components when appropriate
+const MemoizedComponent = memo(({ data }) => {
+  return <div>{data.value}</div>
+})
+```
+
+## File Naming Conventions
+
+### Components: PascalCase
+
+```
+UserCard.tsx
+DataTable.tsx
+ModalDialog.tsx
+```
+
+### Utilities: camelCase
+
+```
+formatDate.ts
+validateEmail.ts
+debounce.ts
+```
+
+### Types: PascalCase with suffix
+
+```
+User.ts
+ApiResponse.ts
+ComponentProps.ts
+```

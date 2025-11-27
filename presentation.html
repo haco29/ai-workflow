@@ -470,6 +470,66 @@
         line-height: 1.6;
       }
 
+      /* What Next Callout */
+      .what-next-callout {
+        margin: 80px auto 0 auto;
+        max-width: 880px;
+        padding: 28px 32px;
+        border-radius: 16px;
+        background: radial-gradient(
+          circle at top left,
+          rgba(0, 122, 255, 0.18),
+          rgba(0, 0, 0, 0.85)
+        );
+        border: 1px solid rgba(0, 122, 255, 0.35);
+        box-shadow:
+          0 0 24px rgba(0, 122, 255, 0.45),
+          0 0 60px rgba(0, 0, 0, 0.9);
+      }
+
+      .what-next-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 8px;
+        letter-spacing: -0.01em;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .what-next-title span {
+        font-size: 1.7rem;
+      }
+
+      .what-next-body {
+        font-size: 1.05rem;
+        color: #c0c0c0;
+        margin-bottom: 14px;
+      }
+
+      .what-next-diagram {
+        font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+        font-size: 0.95rem;
+        color: #a0a0a0;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: rgba(0, 0, 0, 0.55);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        margin-bottom: 8px;
+        white-space: nowrap;
+        overflow-x: auto;
+      }
+
+      .what-next-steps {
+        font-size: 0.98rem;
+        color: #a8a8a8;
+      }
+
+      .what-next-steps li {
+        margin-left: 18px;
+        margin-bottom: 4px;
+      }
+
       /* Modal styles */
       .workflow-example {
         position: fixed;
@@ -852,6 +912,28 @@
         </div>
       </div>
 
+      <div class="what-next-callout">
+        <div class="what-next-title">
+          <span>🧭</span>
+          <span>Lost in the flow? Ask: what next?</span>
+        </div>
+        <p class="what-next-body">
+          At any point in this 7-step workflow you can run
+          <code>@what-next.md</code> (backed by
+          <code>what-next.mdc</code>) or just ask
+          <em>“what should I do next?”</em>. Cursor will locate you in the flow
+          and suggest the next command plus a tiny checklist of tasks.
+        </p>
+        <div class="what-next-diagram">
+          Context → Progress → Implement → Reflect → Test → Quality → Deploy
+        </div>
+        <ul class="what-next-steps">
+          <li>Detect current step from chat and any <code>progress-*.md</code>.</li>
+          <li>Pick the next step using the 7-step decision rule.</li>
+          <li>Return: current step, next command, and 3–5 concrete tasks.</li>
+        </ul>
+      </div>
+
       <!-- Command Showcase -->
       <div class="container">
         <div class="commands-section">
@@ -891,6 +973,14 @@
               <div class="command-desc">
                 Starts dev server and opens Playwright to give AI browser
                 context for testing
+              </div>
+            </div>
+            <div class="command-card">
+              <div class="command-name">@what-next.md</div>
+              <div class="command-desc">
+                When you&apos;re unsure what to do, maps you to the next step in
+                the 7-step workflow and returns a short checklist of next
+                actions.
               </div>
             </div>
           </div>

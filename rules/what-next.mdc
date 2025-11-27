@@ -1,0 +1,105 @@
+---
+description: Quick helper for deciding the next step in the 7-step Cursor workflow
+globs: ['**/*']
+alwaysApply: false
+---
+
+# What Next? Workflow Helper
+
+Use this rule when the user asks anything like:
+
+- "what next?" / "what now?" / "next step?"
+- "I'm lost" / "where should I continue?"
+- "what should I do after this?"
+
+The goal is to map the user to the **next concrete step** in the 7-step workflow and suggest:
+
+1. Current step in the workflow  
+2. Best **next command** to run (`@progress-md.md`, `@reflect-changes.md`, `@add-tests.md`, `@precommit.md`, etc.)  
+3. A **3–5 item checklist** of tiny, testable tasks
+
+The workflow steps (from the presentation) are:
+
+1. **Context & Planning**  
+2. **Generate Progress Doc**  
+3. **Implement Features**  
+4. **Reflect on Changes**  
+5. **Add Tests**  
+6. **Quality Assurance**  
+7. **Commit & Continue**
+
+## Decision Flow (mental checklist)
+
+Walk this in order, keep questions short, answers yes/no when possible:
+
+1. **Do we have a clear feature/goal and basic context?**  
+   - If **no** → Step 1: Context & Planning  
+     - Help the user restate goal + context files.  
+     - Then usually suggest `@progress-md.md`.
+
+2. **Do we already have a `progress-*.md` (or similar) tracking doc for this work?**  
+   - If **no** → Step 2: Generate Progress Doc  
+     - Next command: `@progress-md.md`.  
+     - Tasks: name the feature, generate doc, bookmark key steps.
+
+3. **Is there at least one pending step in the progress doc that is not implemented yet?**  
+   - If **yes** → Step 3: Implement Features  
+     - Next action: pick **one** pending step (top priority) and implement only that.  
+     - Suggest using React patterns from `react-development.mdc`.
+
+4. **Did we just finish a meaningful chunk of implementation for a step?**  
+   - If **yes** and reflection not done → Step 4: Reflect on Changes  
+     - Next command: `@reflect-changes.md`.  
+     - Focus on React patterns, extraction opportunities, API usage.
+
+5. **Does this feature lack focused tests for the new behavior?**  
+   - If **yes** → Step 5: Add Tests  
+     - Next command: `@add-tests.md`.  
+     - Tests should be user-centric and follow existing testing patterns.
+
+6. **Have we run pre-commit quality checks for the current changes?**  
+   - If **no** or failing → Step 6: Quality Assurance  
+     - Next command: `@precommit.md` (and underlying `mise` tasks).  
+     - Use `quality-check.mdc` + `react-development.mdc` to guide fixes.
+
+7. **All checks green and work for this step is done, but not committed/PR'd?**  
+   - If **yes** → Step 7: Commit & Continue  
+     - Suggest creating a focused commit and then updating the progress doc.  
+     - Optionally suggest using any commit/PR helper commands that exist.
+
+If multiple answers apply, bias toward **earlier unfinished steps** (plan → implement → test → quality → commit).
+
+## How to respond
+
+When answering a "what next?" question:
+
+1. **Detect current step**
+   - Use recent conversation, open files, and any `progress-*.md` snippets.  
+   - Ask at most **3 very short questions** if unclear (yes/no, single-sentence).
+
+2. **Pick the next step using the decision flow**
+   - Map to one of the 7 named steps.  
+   - Prefer one primary step, mention a secondary only if truly important.
+
+3. **Return a compact answer**
+
+Structure your response like:
+
+- **Where you are**: `Step 03 – Implement Features (working on STEP-002 from progress.md)`  
+- **What next command to run**: e.g. `Run @start-playwrite.md to get browser context, then implement STEP-002.`  
+- **Tiny checklist (3–5 items)**:
+  - Implement the specific UI / behavior for the next STEP-XXX.
+  - Keep changes small and commit-ready.
+  - Add or update tests for this behavior.
+  - Update `progress-*.md` status for this step.
+
+Keep language **short, concrete, and action-focused**. Favor checklists over long prose.
+
+## Integration with other rules
+
+When suggesting implementation or tests:
+
+- Follow patterns from `react-development.mdc`.  
+- Use quality guidance from `quality-check.mdc`.  
+- Use API patterns from `api-development.mdc` when relevant.
+
